@@ -1,7 +1,7 @@
 Public firmware bundles for JSense device.
 
 Structure:
-- JsenseFirmware/
+- JSenseFirmware/
   - vX.Y.Z/
     - jsense-vX.Y.Z.jsb   (bundle: firmware + LittleFS)
 
