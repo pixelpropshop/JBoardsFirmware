@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
 import { systemService } from '../services/systemService';
-import type { SystemInfo } from '../types/system';
+import type { SystemInfo, FirmwareUpdateProgress } from '../types/system';
+import { calculateSHA256, formatHash } from '../utils/crypto';
 
 export default function About() {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploadingFirmware, setUploadingFirmware] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState<FirmwareUpdateProgress | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [expectedChecksum, setExpectedChecksum] = useState('');
+  const [calculatingChecksum, setCalculatingChecksum] = useState(false);
+  const [fileChecksum, setFileChecksum] = useState('');
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
     message: string;
@@ -44,11 +49,23 @@ export default function About() {
       return;
     }
 
+    // Calculate checksum for verification
+    if (showAdvancedOptions) {
+      setCalculatingChecksum(true);
+      try {
+        const checksum = await calculateSHA256(file);
+        setFileChecksum(checksum);
+      } catch (error) {
+        console.error('Failed to calculate checksum:', error);
+      }
+      setCalculatingChecksum(false);
+    }
+
     // Show confirmation dialog
     setPendingFile({ file, input: event.target });
     setConfirmDialog({
       title: 'Upload Firmware',
-      message: `Upload firmware "${file.name}"? Device will restart after update.`,
+      message: `Upload firmware "${file.name}" (${systemService.formatBytes(file.size)})? Device will restart after update.`,
       onConfirm: () => performFirmwareUpload(file, event.target),
     });
   };
@@ -56,35 +73,42 @@ export default function About() {
   const performFirmwareUpload = async (file: File, input: HTMLInputElement) => {
     try {
       setUploadingFirmware(true);
-      setUploadProgress(0);
+      setUploadProgress(null);
       setActionMessage(null);
 
-      // Simulate progress for mock data
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => Math.min(prev + 10, 90));
-      }, 200);
+      // Use checksum verification if provided
+      const checksum = showAdvancedOptions && expectedChecksum ? expectedChecksum : undefined;
 
-      const result = await systemService.uploadFirmware(file);
-
-      clearInterval(progressInterval);
-      setUploadProgress(100);
+      const result = await systemService.uploadFirmware(
+        file,
+        (progress) => {
+          setUploadProgress(progress);
+        },
+        checksum
+      );
 
       if (result.success) {
         setActionMessage({ type: 'success', text: result.message });
+        
+        // Clear file input and checksum state
+        setFileChecksum('');
+        setExpectedChecksum('');
+        
         // Device will restart, so show message for a few seconds
         setTimeout(() => {
           window.location.reload();
         }, 3000);
       } else {
-        setActionMessage({ type: 'error', text: result.message || 'Firmware update failed' });
+        setActionMessage({ type: 'error', text: result.message || result.error || 'Firmware update failed' });
       }
 
       input.value = '';
     } catch (error) {
-      setActionMessage({ type: 'error', text: 'Failed to upload firmware' });
+      setActionMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to upload firmware' });
       console.error(error);
     } finally {
       setUploadingFirmware(false);
+      setUploadProgress(null);
       setPendingFile(null);
     }
   };
@@ -307,18 +331,113 @@ export default function About() {
               </div>
             </label>
 
-            {uploadingFirmware && (
-              <div>
-                <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
-                  <span>Upload Progress</span>
-                  <span>{uploadProgress}%</span>
+            {uploadingFirmware && uploadProgress && (
+              <div className="space-y-2">
+                {/* Stage indicator */}
+                <div className="flex items-center gap-2 text-sm">
+                  <div className={`w-2 h-2 rounded-full animate-pulse ${
+                    uploadProgress.stage === 'verifying' ? 'bg-yellow-500' :
+                    uploadProgress.stage === 'uploading' ? 'bg-blue-500' :
+                    uploadProgress.stage === 'installing' ? 'bg-purple-500' :
+                    'bg-green-500'
+                  }`} />
+                  <span className="text-gray-700 dark:text-gray-300 font-medium">
+                    {uploadProgress.stage === 'verifying' ? '🔍 Verifying' :
+                     uploadProgress.stage === 'uploading' ? '📤 Uploading' :
+                     uploadProgress.stage === 'installing' ? '⚙️ Installing' :
+                     '✅ Complete'}
+                  </span>
                 </div>
-                <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-brand-600 transition-all duration-300"
-                    style={{ width: `${uploadProgress}%` }}
+
+                {/* Progress message */}
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {uploadProgress.message}
+                </p>
+
+                {/* Progress bar */}
+                <div>
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                    <span>Progress</span>
+                    <span>{uploadProgress.progress}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-brand-600 transition-all duration-300"
+                      style={{ width: `${uploadProgress.progress}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Upload details (bytes and time remaining) */}
+                {uploadProgress.bytesUploaded !== undefined && uploadProgress.totalBytes !== undefined && (
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>
+                      {systemService.formatBytes(uploadProgress.bytesUploaded)} / {systemService.formatBytes(uploadProgress.totalBytes)}
+                    </span>
+                    {uploadProgress.timeRemaining !== undefined && uploadProgress.timeRemaining > 0 && (
+                      <span>~{uploadProgress.timeRemaining}s remaining</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Advanced options */}
+            <button
+              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+              className="text-sm text-brand-600 hover:underline"
+            >
+              {showAdvancedOptions ? '▼' : '▶'} Advanced Options
+            </button>
+
+            {showAdvancedOptions && (
+              <div className="space-y-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Expected SHA256 Checksum (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={expectedChecksum}
+                    onChange={(e) => setExpectedChecksum(e.target.value)}
+                    placeholder="Enter expected checksum to verify file integrity"
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    disabled={uploadingFirmware}
                   />
+                  <p className="mt-1 text-xs text-gray-500">
+                    If provided, the file will be verified before upload
+                  </p>
                 </div>
+
+                {fileChecksum && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      File Checksum
+                    </label>
+                    <div className="p-2 bg-white dark:bg-gray-800 rounded border border-gray-300 dark:border-gray-700">
+                      <p className="text-xs font-mono break-all text-gray-700 dark:text-gray-300">
+                        {fileChecksum}
+                      </p>
+                    </div>
+                    {expectedChecksum && (
+                      <p className={`mt-1 text-xs ${
+                        fileChecksum.toLowerCase() === expectedChecksum.toLowerCase()
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                      }`}>
+                        {fileChecksum.toLowerCase() === expectedChecksum.toLowerCase()
+                          ? '✓ Checksum matches'
+                          : '✗ Checksum does not match'}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {calculatingChecksum && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Calculating checksum...
+                  </p>
+                )}
               </div>
             )}
           </div>

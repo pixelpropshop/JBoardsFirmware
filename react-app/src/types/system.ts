@@ -50,7 +50,19 @@ export interface FirmwareUpdateResponse {
   success: boolean;
   message: string;
   progress?: number;
+  stage?: 'verifying' | 'uploading' | 'installing' | 'complete' | 'error';
   newVersion?: string;
+  error?: string;
+  checksumVerified?: boolean;
+}
+
+export interface FirmwareUpdateProgress {
+  stage: 'verifying' | 'uploading' | 'installing' | 'complete';
+  progress: number; // 0-100
+  bytesUploaded?: number;
+  totalBytes?: number;
+  timeRemaining?: number; // seconds
+  message: string;
 }
 
 export interface SystemActionResponse {

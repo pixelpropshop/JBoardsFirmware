@@ -2873,20 +2873,34 @@ void scanDirectory(const char* path, JsonArray& files) {
 
 **Endpoint:** `POST /api/system/firmware/update`
 
-**Description:** Upload and install firmware update (.bin file).
+**Description:** Upload and install firmware update (.bin file) with progress tracking and optional checksum verification.
 
 **Request:** `multipart/form-data`
 
 **Form Fields:**
 - `firmware`: Firmware binary file (.bin extension)
+- `checksum`: Optional SHA256 checksum (hex string, 64 characters) for verification
 
-**Response:**
+**Response (Success):**
 ```json
 {
   "success": true,
   "message": "Firmware uploaded successfully. Device will restart.",
   "progress": 100,
-  "newVersion": "1.1.0"
+  "stage": "complete",
+  "newVersion": "1.1.0",
+  "checksumVerified": true
+}
+```
+
+**Response (Checksum Failed):**
+```json
+{
+  "success": false,
+  "message": "Firmware file checksum verification failed",
+  "stage": "error",
+  "error": "Checksum mismatch",
+  "checksumVerified": false
 }
 ```
 
@@ -2894,17 +2908,64 @@ void scanDirectory(const char* path, JsonArray& files) {
 ```json
 {
   "success": false,
-  "message": "Invalid firmware file or upload failed"
+  "message": "Invalid firmware file or upload failed",
+  "stage": "error",
+  "error": "Upload interrupted"
+}
+```
+
+**Progress Updates (Frontend tracks via XMLHttpRequest):**
+```json
+{
+  "stage": "verifying",
+  "progress": 50,
+  "message": "Calculating file checksum..."
+}
+```
+```json
+{
+  "stage": "uploading",
+  "progress": 75,
+  "bytesUploaded": 1572864,
+  "totalBytes": 2097152,
+  "timeRemaining": 5,
+  "message": "Uploading firmware... 75%"
+}
+```
+```json
+{
+  "stage": "installing",
+  "progress": 100,
+  "message": "Installing firmware..."
 }
 ```
 
 **Notes:**
-- File must have .bin extension
-- OTA update process - device restarts automatically
-- Progress can be tracked during upload (0-100%)
-- Validate firmware before flashing
-- Backup current firmware if possible
-- Maximum file size: 2MB (typical firmware size)
+- **SHA256 Verification (Phase 1 Enhancement):**
+  - Frontend calculates SHA256 hash using Web Crypto API
+  - Optional checksum can be provided for file integrity verification
+  - If checksum provided, backend verifies before flashing
+  - Prevents installation of corrupted files
+  
+- **Real-time Progress Tracking (Phase 1 Enhancement):**
+  - Frontend uses XMLHttpRequest for upload with progress events
+  - Multi-stage tracking: verifying → uploading → installing → complete
+  - Progress percentage (0-100) for each stage
+  - Bytes uploaded and total bytes displayed during upload
+  - Time remaining estimation based on current upload speed
+  
+- **Enhanced Error Handling (Phase 1 Enhancement):**
+  - Detailed error messages for different failure modes
+  - Stage indicator shows where failure occurred
+  - Checksum verification failures reported before upload
+  - Upload interruptions detected and reported
+  
+- **General:**
+  - File must have .bin extension
+  - OTA update process - device restarts automatically
+  - Validate firmware before flashing
+  - Backup current firmware if possible
+  - Maximum file size: 2MB (typical firmware size)
 
 **ESP32 OTA Implementation:**
 ```cpp
