@@ -485,139 +485,281 @@ export default function Settings() {
           </div>
         )}
 
-        {/* Firmware Update - Check for Updates */}
+        {/* Firmware Update & Manual Upload */}
         <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60">
           <h2 className="text-lg font-medium mb-4">Firmware Update</h2>
           
-          <div className="space-y-3">
-            <button
-              onClick={handleCheckForUpdates}
-              disabled={checkingForUpdates || !systemInfo}
-              className={`w-full px-4 py-2 rounded-lg text-white transition-colors ${
-                checkingForUpdates
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-green-600 hover:bg-green-700'
-              }`}
-            >
-              {checkingForUpdates ? 'Checking for Updates...' : '🔍 Check for Updates'}
-            </button>
+          <div className="space-y-4">
+            {/* Check for Updates */}
+            <div className="space-y-3">
+              <button
+                onClick={handleCheckForUpdates}
+                disabled={checkingForUpdates || !systemInfo}
+                className={`w-full px-4 py-2 rounded-lg text-white transition-colors ${
+                  checkingForUpdates
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                {checkingForUpdates ? 'Checking for Updates...' : '🔍 Check for Updates'}
+              </button>
 
-            {updateCheckResult && (
-              <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Current Version: {updateCheckResult.currentVersion}
-                    </p>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Latest Version: {updateCheckResult.latestVersion}
-                    </p>
-                  </div>
-                  {updateCheckResult.updateAvailable && (
-                    <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full">
-                      Update Available
-                    </span>
-                  )}
-                </div>
-
-                {updateCheckResult.latestStable && updateCheckResult.updateAvailable && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Latest Release Notes:
-                    </p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-line">
-                      {updateCheckResult.latestStable.changelog}
-                    </p>
-                    <button
-                      onClick={() => handleDownloadAndInstall(updateCheckResult.latestVersion)}
-                      disabled={downloadingFirmware || uploadingFirmware}
-                      className="mt-2 w-full px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white transition-colors"
-                    >
-                      📥 Download and Install v{updateCheckResult.latestVersion}
-                    </button>
-                  </div>
-                )}
-
-                {updateCheckResult.allVersions && updateCheckResult.allVersions.length > 1 && (
-                  <div>
-                    <button
-                      onClick={() => setShowAllVersions(!showAllVersions)}
-                      className="text-sm text-brand-600 hover:underline"
-                    >
-                      {showAllVersions ? '▼' : '▶'} View All Versions ({updateCheckResult.allVersions.length})
-                    </button>
-
-                    {showAllVersions && (
-                      <div className="mt-2 space-y-2 max-h-64 overflow-y-auto">
-                        {updateCheckResult.allVersions.map((version) => {
-                          const badge = firmwareService.formatVersionBadge(
-                            version,
-                            updateCheckResult.currentVersion
-                          );
-                          return (
-                            <div
-                              key={version.version}
-                              className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-sm">v{version.version}</span>
-                                  {badge.text && (
-                                    <span
-                                      className={`px-2 py-0.5 text-xs rounded-full ${
-                                        badge.color === 'blue'
-                                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
-                                          : badge.color === 'green'
-                                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
-                                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                                      }`}
-                                    >
-                                      {badge.text}
-                                    </span>
-                                  )}
-                                  {version.stable && (
-                                    <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200">
-                                      Stable
-                                    </span>
-                                  )}
-                                </div>
-                                <span className="text-xs text-gray-500">{version.buildDate}</span>
-                              </div>
-                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2 whitespace-pre-line">
-                                {version.changelog}
-                              </p>
-                              {badge.text !== 'Current' && (
-                                <button
-                                  onClick={() => handleDownloadAndInstall(version.version)}
-                                  disabled={downloadingFirmware || uploadingFirmware}
-                                  className="w-full px-3 py-1.5 rounded-lg text-sm bg-brand-600 hover:bg-brand-700 text-white transition-colors disabled:bg-gray-400"
-                                >
-                                  Install v{version.version}
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+              {updateCheckResult && (
+                <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Current Version: {updateCheckResult.currentVersion}
+                      </p>
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Latest Version: {updateCheckResult.latestVersion}
+                      </p>
+                    </div>
+                    {updateCheckResult.updateAvailable && (
+                      <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full">
+                        Update Available
+                      </span>
                     )}
                   </div>
-                )}
-              </div>
-            )}
 
-            {downloadingFirmware && (
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Downloading firmware from GitHub... {downloadProgress}%
-                </p>
-                <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-green-600 transition-all duration-300"
-                    style={{ width: `${downloadProgress}%` }}
-                  />
+                  {updateCheckResult.latestStable && updateCheckResult.updateAvailable && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Latest Release Notes:
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-line">
+                        {updateCheckResult.latestStable.changelog}
+                      </p>
+                      <button
+                        onClick={() => handleDownloadAndInstall(updateCheckResult.latestVersion)}
+                        disabled={downloadingFirmware || uploadingFirmware}
+                        className="mt-2 w-full px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white transition-colors"
+                      >
+                        📥 Download and Install v{updateCheckResult.latestVersion}
+                      </button>
+                    </div>
+                  )}
+
+                  {updateCheckResult.allVersions && updateCheckResult.allVersions.length > 1 && (
+                    <div>
+                      <button
+                        onClick={() => setShowAllVersions(!showAllVersions)}
+                        className="text-sm text-brand-600 hover:underline"
+                      >
+                        {showAllVersions ? '▼' : '▶'} View All Versions ({updateCheckResult.allVersions.length})
+                      </button>
+
+                      {showAllVersions && (
+                        <div className="mt-2 space-y-2 max-h-64 overflow-y-auto">
+                          {updateCheckResult.allVersions.map((version) => {
+                            const badge = firmwareService.formatVersionBadge(
+                              version,
+                              updateCheckResult.currentVersion
+                            );
+                            return (
+                              <div
+                                key={version.version}
+                                className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                              >
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-sm">v{version.version}</span>
+                                    {badge.text && (
+                                      <span
+                                        className={`px-2 py-0.5 text-xs rounded-full ${
+                                          badge.color === 'blue'
+                                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
+                                            : badge.color === 'green'
+                                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                        }`}
+                                      >
+                                        {badge.text}
+                                      </span>
+                                    )}
+                                    {version.stable && (
+                                      <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200">
+                                        Stable
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-gray-500">{version.buildDate}</span>
+                                </div>
+                                <p className="text-xs text-gray-600 dark:text-gray-400 mb-2 whitespace-pre-line">
+                                  {version.changelog}
+                                </p>
+                                {badge.text !== 'Current' && (
+                                  <button
+                                    onClick={() => handleDownloadAndInstall(version.version)}
+                                    disabled={downloadingFirmware || uploadingFirmware}
+                                    className="w-full px-3 py-1.5 rounded-lg text-sm bg-brand-600 hover:bg-brand-700 text-white transition-colors disabled:bg-gray-400"
+                                  >
+                                    Install v{version.version}
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
+
+              {downloadingFirmware && (
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Downloading firmware from GitHub... {downloadProgress}%
+                  </p>
+                  <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-green-600 transition-all duration-300"
+                      style={{ width: `${downloadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-gray-200 dark:border-gray-800"></div>
+
+            {/* Manual Upload */}
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Or upload a firmware file (.bin) manually. The device will automatically restart after the update.
+              </p>
+
+              <label className="block">
+                <input
+                  type="file"
+                  accept=".bin"
+                  onChange={handleFirmwareUpload}
+                  disabled={uploadingFirmware}
+                  className="hidden"
+                />
+                <div
+                  className={`px-4 py-2 rounded-lg text-center cursor-pointer transition-colors ${
+                    uploadingFirmware
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-brand-600 hover:bg-brand-700 text-white'
+                  }`}
+                >
+                  {uploadingFirmware ? 'Uploading Firmware...' : '📤 Upload Firmware File (.bin)'}
+                </div>
+              </label>
+
+              {uploadingFirmware && uploadProgress && (
+                <div className="space-y-2">
+                  {/* Stage indicator */}
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${
+                      uploadProgress.stage === 'verifying' ? 'bg-yellow-500' :
+                      uploadProgress.stage === 'uploading' ? 'bg-blue-500' :
+                      uploadProgress.stage === 'installing' ? 'bg-purple-500' :
+                      'bg-green-500'
+                    }`} />
+                    <span className="text-gray-700 dark:text-gray-300 font-medium">
+                      {uploadProgress.stage === 'verifying' ? '🔍 Verifying' :
+                       uploadProgress.stage === 'uploading' ? '📤 Uploading' :
+                       uploadProgress.stage === 'installing' ? '⚙️ Installing' :
+                       '✅ Complete'}
+                    </span>
+                  </div>
+
+                  {/* Progress message */}
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {uploadProgress.message}
+                  </p>
+
+                  {/* Progress bar */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                      <span>Progress</span>
+                      <span>{uploadProgress.progress}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-brand-600 transition-all duration-300"
+                        style={{ width: `${uploadProgress.progress}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Upload details (bytes and time remaining) */}
+                  {uploadProgress.bytesUploaded !== undefined && uploadProgress.totalBytes !== undefined && (
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>
+                        {systemService.formatBytes(uploadProgress.bytesUploaded)} / {systemService.formatBytes(uploadProgress.totalBytes)}
+                      </span>
+                      {uploadProgress.timeRemaining !== undefined && uploadProgress.timeRemaining > 0 && (
+                        <span>~{uploadProgress.timeRemaining}s remaining</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Advanced options */}
+              <button
+                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                className="text-sm text-brand-600 hover:underline"
+              >
+                {showAdvancedOptions ? '▼' : '▶'} Advanced Options
+              </button>
+
+              {showAdvancedOptions && (
+                <div className="space-y-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Expected SHA256 Checksum (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={expectedChecksum}
+                      onChange={(e) => setExpectedChecksum(e.target.value)}
+                      placeholder="Enter expected checksum to verify file integrity"
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      disabled={uploadingFirmware}
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      If provided, the file will be verified before upload
+                    </p>
+                  </div>
+
+                  {fileChecksum && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        File Checksum
+                      </label>
+                      <div className="p-2 bg-white dark:bg-gray-800 rounded border border-gray-300 dark:border-gray-700">
+                        <p className="text-xs font-mono break-all text-gray-700 dark:text-gray-300">
+                          {fileChecksum}
+                        </p>
+                      </div>
+                      {expectedChecksum && (
+                        <p className={`mt-1 text-xs ${
+                          fileChecksum.toLowerCase() === expectedChecksum.toLowerCase()
+                            ? 'text-green-600'
+                            : 'text-red-600'
+                        }`}>
+                          {fileChecksum.toLowerCase() === expectedChecksum.toLowerCase()
+                            ? '✓ Checksum matches'
+                            : '✗ Checksum does not match'}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {calculatingChecksum && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Calculating checksum...
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -699,145 +841,6 @@ export default function Settings() {
           </div>
         )}
 
-        {/* Firmware Update - Manual Upload */}
-        <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60">
-          <h2 className="text-lg font-medium mb-4">Manual Firmware Upload</h2>
-          
-          <div className="space-y-3">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Upload a new firmware file (.bin) to update the device. The device will automatically restart after the update.
-            </p>
-
-            <label className="block">
-              <input
-                type="file"
-                accept=".bin"
-                onChange={handleFirmwareUpload}
-                disabled={uploadingFirmware}
-                className="hidden"
-              />
-              <div
-                className={`px-4 py-2 rounded-lg text-center cursor-pointer transition-colors ${
-                  uploadingFirmware
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-brand-600 hover:bg-brand-700 text-white'
-                }`}
-              >
-                {uploadingFirmware ? 'Uploading Firmware...' : 'Select Firmware File (.bin)'}
-              </div>
-            </label>
-
-            {uploadingFirmware && uploadProgress && (
-              <div className="space-y-2">
-                {/* Stage indicator */}
-                <div className="flex items-center gap-2 text-sm">
-                  <div className={`w-2 h-2 rounded-full animate-pulse ${
-                    uploadProgress.stage === 'verifying' ? 'bg-yellow-500' :
-                    uploadProgress.stage === 'uploading' ? 'bg-blue-500' :
-                    uploadProgress.stage === 'installing' ? 'bg-purple-500' :
-                    'bg-green-500'
-                  }`} />
-                  <span className="text-gray-700 dark:text-gray-300 font-medium">
-                    {uploadProgress.stage === 'verifying' ? '🔍 Verifying' :
-                     uploadProgress.stage === 'uploading' ? '📤 Uploading' :
-                     uploadProgress.stage === 'installing' ? '⚙️ Installing' :
-                     '✅ Complete'}
-                  </span>
-                </div>
-
-                {/* Progress message */}
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {uploadProgress.message}
-                </p>
-
-                {/* Progress bar */}
-                <div>
-                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                    <span>Progress</span>
-                    <span>{uploadProgress.progress}%</span>
-                  </div>
-                  <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-brand-600 transition-all duration-300"
-                      style={{ width: `${uploadProgress.progress}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Upload details (bytes and time remaining) */}
-                {uploadProgress.bytesUploaded !== undefined && uploadProgress.totalBytes !== undefined && (
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>
-                      {systemService.formatBytes(uploadProgress.bytesUploaded)} / {systemService.formatBytes(uploadProgress.totalBytes)}
-                    </span>
-                    {uploadProgress.timeRemaining !== undefined && uploadProgress.timeRemaining > 0 && (
-                      <span>~{uploadProgress.timeRemaining}s remaining</span>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Advanced options */}
-            <button
-              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-              className="text-sm text-brand-600 hover:underline"
-            >
-              {showAdvancedOptions ? '▼' : '▶'} Advanced Options
-            </button>
-
-            {showAdvancedOptions && (
-              <div className="space-y-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Expected SHA256 Checksum (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={expectedChecksum}
-                    onChange={(e) => setExpectedChecksum(e.target.value)}
-                    placeholder="Enter expected checksum to verify file integrity"
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                    disabled={uploadingFirmware}
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    If provided, the file will be verified before upload
-                  </p>
-                </div>
-
-                {fileChecksum && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      File Checksum
-                    </label>
-                    <div className="p-2 bg-white dark:bg-gray-800 rounded border border-gray-300 dark:border-gray-700">
-                      <p className="text-xs font-mono break-all text-gray-700 dark:text-gray-300">
-                        {fileChecksum}
-                      </p>
-                    </div>
-                    {expectedChecksum && (
-                      <p className={`mt-1 text-xs ${
-                        fileChecksum.toLowerCase() === expectedChecksum.toLowerCase()
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                      }`}>
-                        {fileChecksum.toLowerCase() === expectedChecksum.toLowerCase()
-                          ? '✓ Checksum matches'
-                          : '✗ Checksum does not match'}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {calculatingChecksum && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Calculating checksum...
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
 
         {/* System Actions */}
         <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60">
