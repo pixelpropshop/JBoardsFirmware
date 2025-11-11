@@ -3,7 +3,10 @@ import type {
   FirmwareManifest,
   VersionsManifest,
   UpdateCheckResult,
+  FirmwareBackup,
+  OTAStatus,
 } from '../types/firmware';
+import { api } from './api';
 
 // GitHub repository configuration
 const GITHUB_REPO = 'pixelpropshop/JBoardsFirmware';
@@ -185,5 +188,96 @@ export const firmwareService = {
     }
 
     return { text: '', color: 'gray' };
+  },
+
+  /**
+   * Get OTA partition status and backup information
+   */
+  async getOTAStatus(): Promise<OTAStatus> {
+    try {
+      const response = await api.fetch<OTAStatus>('/api/system/firmware/ota-status');
+      return response;
+    } catch (error) {
+      console.error('Failed to get OTA status:', error);
+      // Return mock data for development
+      return {
+        currentPartition: 'ota_0',
+        currentVersion: '1.0.0',
+        backupPartition: 'ota_1',
+        backupVersion: '0.9.5',
+        bootCount: 1,
+        lastBootSuccess: true,
+        safeBoot: false,
+        rollbackAvailable: true,
+      };
+    }
+  },
+
+  /**
+   * Get firmware backup information
+   */
+  async getBackupInfo(): Promise<FirmwareBackup> {
+    try {
+      const status = await this.getOTAStatus();
+      
+      return {
+        hasBackup: status.rollbackAvailable,
+        backupVersion: status.backupVersion,
+        backupPartition: status.backupPartition,
+      };
+    } catch (error) {
+      console.error('Failed to get backup info:', error);
+      return {
+        hasBackup: false,
+      };
+    }
+  },
+
+  /**
+   * Rollback to previous firmware version
+   */
+  async rollbackFirmware(): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await api.fetch<{ success: boolean; message: string }>(
+        '/api/system/firmware/rollback',
+        { method: 'POST' }
+      );
+      return response;
+    } catch (error) {
+      console.error('Failed to rollback firmware:', error);
+      throw new Error('Failed to rollback to previous firmware version');
+    }
+  },
+
+  /**
+   * Mark current firmware boot as valid (prevents auto-rollback)
+   */
+  async markBootValid(): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await api.fetch<{ success: boolean; message: string }>(
+        '/api/system/firmware/mark-valid',
+        { method: 'POST' }
+      );
+      return response;
+    } catch (error) {
+      console.error('Failed to mark boot as valid:', error);
+      throw new Error('Failed to validate firmware boot');
+    }
+  },
+
+  /**
+   * Enable safe boot mode (boots to previous firmware on next restart)
+   */
+  async enableSafeBoot(): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await api.fetch<{ success: boolean; message: string }>(
+        '/api/system/firmware/safe-boot',
+        { method: 'POST' }
+      );
+      return response;
+    } catch (error) {
+      console.error('Failed to enable safe boot:', error);
+      throw new Error('Failed to enable safe boot mode');
+    }
   },
 };

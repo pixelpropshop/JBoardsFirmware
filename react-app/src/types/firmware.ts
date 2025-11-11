@@ -37,3 +37,38 @@ export interface UpdateCheckResult {
   latestStable?: FirmwareVersion;
   allVersions?: FirmwareVersion[];
 }
+
+/**
+ * Firmware backup information
+ */
+export interface FirmwareBackup {
+  hasBackup: boolean;
+  backupVersion?: string;
+  backupDate?: string;
+  backupPartition?: string;
+  backupSize?: number;
+}
+
+/**
+ * OTA partition information
+ */
+export interface OTAPartition {
+  partition: string;
+  version: string;
+  bootable: boolean;
+  validated: boolean;
+}
+
+/**
+ * OTA status information
+ */
+export interface OTAStatus {
+  currentPartition: string;
+  currentVersion: string;
+  backupPartition?: string;
+  backupVersion?: string;
+  bootCount: number;
+  lastBootSuccess: boolean;
+  safeBoot: boolean;
+  rollbackAvailable: boolean;
+}

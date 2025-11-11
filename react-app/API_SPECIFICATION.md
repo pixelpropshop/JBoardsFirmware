@@ -3253,6 +3253,332 @@ server.on("/api/system/clear-logs", HTTP_POST, [](AsyncWebServerRequest *request
 
 ---
 
+## Phase 3 OTA Enhancements - Rollback & Recovery
+
+### Overview
+
+Phase 3 adds automatic firmware backup and rollback capabilities using ESP32's dual OTA partition system. This provides a safety net for firmware updates, allowing users to recover from failed updates and roll back to the previous working version.
+
+### ESP32 OTA Partition System
+
+The ESP32 has dual OTA partitions (ota_0 and ota_1) that enable safe firmware updates:
+- **Active Partition**: Currently running firmware
+- **Backup Partition**: Previous firmware version (automatically preserved during OTA)
+- **Automatic Backup**: ESP32 OTA API automatically preserves current firmware when updating
+- **Rollback Support**: Can boot from backup partition if current firmware fails
+
+### 70. Get OTA Status
+
+**Endpoint:** `GET /api/system/firmware/ota-status`
+
+**Description:** Retrieve current OTA partition status and backup information.
+
+**Response:**
+```json
+{
+  "currentPartition": "ota_0",
+  "currentVersion": "1.0.0",
+  "backupPartition": "ota_1",
+  "backupVersion": "0.9.5",
+  "bootCount": 1,
+  "lastBootSuccess": true,
+  "safeBoot": false,
+  "rollbackAvailable": true
+}
+```
+
+**Notes:**
+- currentPartition: Name of active OTA partition (ota_0 or ota_1)
+- currentVersion: Version string from active firmware
+- backupPartition: Name of backup OTA partition
+- backupVersion: Version string from backup firmware (if available)
+- bootCount: Number of boots since last firmware update
+- lastBootSuccess: Whether previous boot was successful
+- safeBoot: Whether device is in safe boot mode
+- rollbackAvailable: Whether backup firmware is available for rollback
+
+---
+
+### 71. Rollback Firmware
+
+**Endpoint:** `POST /api/system/firmware/rollback`
+
+**Description:** Roll back to previous firmware version in backup partition.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Rolling back to version 0.9.5. Device will restart..."
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "No backup firmware available"
+}
+```
+
+**Notes:**
+- Switches boot partition to backup partition
+- Device automatically restarts after rollback
+- Current firmware becomes backup after restart
+- Only available if backup partition contains valid firmware
+- Irreversible - current firmware state will be lost
+
+**ESP32 Implementation:**
+```cpp
+server.on("/api/system/firmware/rollback", HTTP_POST, [](AsyncWebServerRequest *request){
+  const esp_partition_t* boot_partition = esp_ota_get_boot_partition();
+  const esp_partition_t* next_partition = esp_ota_get_next_update_target(boot_partition);
+  
+  if (next_partition == NULL) {
+    request->send(400, "application/json", 
+      "{\"success\":false,\"message\":\"No backup firmware available\"}");
+    return;
+  }
+  
+  // Set boot partition to backup
+  esp_err_t err = esp_ota_set_boot_partition(next_partition);
+  if (err != ESP_OK) {
+    request->send(500, "application/json", 
+      "{\"success\":false,\"message\":\"Failed to set boot partition\"}");
+    return;
+  }
+  
+  request->send(200, "application/json",
+    "{\"success\":true,\"message\":\"Rolling back. Device will restart...\"}");
+  delay(1000);
+  ESP.restart();
+});
+```
+
+---
+
+### 72. Mark Boot Valid
+
+**Endpoint:** `POST /api/system/firmware/mark-valid`
+
+**Description:** Mark current firmware boot as valid to prevent automatic rollback.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Current firmware validated successfully"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Failed to mark firmware as valid"
+}
+```
+
+**Notes:**
+- Validates current firmware boot
+- Prevents ESP32 from auto-rolling back on next boot
+- Should be called after successful boot and validation checks
+- Resets boot failure counter
+- Important for safety during firmware updates
+
+**ESP32 Implementation:**
+```cpp
+server.on("/api/system/firmware/mark-valid", HTTP_POST, [](AsyncWebServerRequest *request){
+  const esp_partition_t* partition = esp_ota_get_running_partition();
+  
+  esp_err_t err = esp_ota_mark_app_valid_cancel_rollback();
+  if (err != ESP_OK) {
+    request->send(500, "application/json",
+      "{\"success\":false,\"message\":\"Failed to validate firmware\"}");
+    return;
+  }
+  
+  request->send(200, "application/json",
+    "{\"success\":true,\"message\":\"Firmware validated successfully\"}");
+});
+```
+
+---
+
+### 73. Enable Safe Boot Mode
+
+**Endpoint:** `POST /api/system/firmware/safe-boot`
+
+**Description:** Enable safe boot mode to boot from backup partition on next restart.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Safe boot enabled. Device will boot from backup on next restart."
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "No backup firmware available"
+}
+```
+
+**Notes:**
+- Sets device to boot from backup partition on next restart
+- Used for troubleshooting or testing backup firmware
+- Does not immediately restart device
+- User must manually restart for safe boot to take effect
+- Requires valid backup firmware
+
+**ESP32 Implementation:**
+```cpp
+server.on("/api/system/firmware/safe-boot", HTTP_POST, [](AsyncWebServerRequest *request){
+  const esp_partition_t* boot_partition = esp_ota_get_boot_partition();
+  const esp_partition_t* next_partition = esp_ota_get_next_update_target(boot_partition);
+  
+  if (next_partition == NULL) {
+    request->send(400, "application/json",
+      "{\"success\":false,\"message\":\"No backup firmware available\"}");
+    return;
+  }
+  
+  // Set boot partition without restart
+  esp_err_t err = esp_ota_set_boot_partition(next_partition);
+  if (err != ESP_OK) {
+    request->send(500, "application/json",
+      "{\"success\":false,\"message\":\"Failed to enable safe boot\"}");
+    return;
+  }
+  
+  request->send(200, "application/json",
+    "{\"success\":true,\"message\":\"Safe boot enabled. Restart to boot from backup.\"}");
+});
+```
+
+---
+
+## Phase 3 Implementation Notes
+
+### Automatic Firmware Backup
+
+The ESP32 OTA system automatically handles firmware backup:
+1. **During OTA Update:**
+   - Current firmware is automatically preserved in inactive partition
+   - New firmware is written to the inactive partition
+   - Boot partition is switched only after successful write
+   - No additional code needed for backup creation
+
+2. **Partition Management:**
+   - ESP32 has two OTA partitions: ota_0 and ota_1
+   - Only one partition is active at a time
+   - Update always writes to inactive partition
+   - Previous firmware remains intact in current partition
+
+### Rollback Safety
+
+1. **Boot Validation:**
+   - New firmware should call `esp_ota_mark_app_valid_cancel_rollback()` after successful boot
+   - If not called within boot timeout, ESP32 may auto-rollback
+   - Frontend can call `/api/system/firmware/mark-valid` after user confirms stable operation
+
+2. **Rollback Conditions:**
+   - User manually triggers rollback
+   - Firmware fails to boot (crash on startup)
+   - Safe boot mode enabled by user
+
+3. **Rollback Prevention:**
+   - Always mark firmware as valid after successful boot
+   - Validate critical functionality before marking valid
+   - Provide user feedback during validation period
+
+### Frontend Integration
+
+**Rollback UI Features:**
+- Display current and backup firmware versions
+- "Rollback" button when backup is available
+- Confirmation dialog with warning about data loss
+- Boot validation status indicator
+- Safe boot mode toggle
+
+**User Workflow:**
+1. User updates firmware
+2. Device reboots with new firmware
+3. Frontend shows "New firmware detected - validating..."
+4. User tests functionality
+5. Frontend auto-validates after 30 seconds or user clicks "Confirm Working"
+6. If issues occur, user can click "Rollback to Previous Version"
+
+### Error Handling
+
+**Common Scenarios:**
+- No backup available: Disable rollback button, show "No backup firmware available"
+- Rollback failure: Show error message, suggest manual recovery
+- Boot validation failure: Automatic rollback may occur (ESP32 safety feature)
+- Corrupted backup: ESP32 may refuse to boot, require manual recovery
+
+### Safe Boot Mode Use Cases
+
+1. **Testing Backup Firmware:**
+   - User enables safe boot mode
+   - Manually restarts device
+   - Device boots from backup partition
+   - User can verify backup firmware works
+   - User can switch back by enabling safe boot again or rolling back
+
+2. **Troubleshooting:**
+   - Current firmware has issues
+   - User enables safe boot to test if backup firmware works
+   - If backup works, user can make backup permanent via rollback
+   - If backup also has issues, points to hardware problem
+
+3. **Development/Testing:**
+   - Developers can quickly switch between firmware versions
+   - Test updates without permanent commitment
+   - Verify rollback functionality
+
+### ESP32 Partition Configuration
+
+**partitions.csv example:**
+```
+# Name,   Type, SubType, Offset,  Size
+nvs,      data, nvs,     0x9000,  0x5000
+otadata,  data, ota,     0xe000,  0x2000
+app0,     app,  ota_0,   0x10000, 0x200000
+app1,     app,  ota_1,   0x210000,0x200000
+spiffs,   data, spiffs,  0x410000,0x3F0000
+```
+
+**Key Points:**
+- otadata: Stores which partition to boot from
+- app0 (ota_0): First OTA partition (2MB)
+- app1 (ota_1): Second OTA partition (2MB)
+- Both partitions must be same size
+- OTA updates alternate between partitions
+
+### Security Considerations
+
+1. **Rollback Protection:**
+   - Malicious actor could force rollback to vulnerable firmware
+   - Consider adding authentication for rollback endpoint
+   - Log all rollback operations
+   - Require admin password for rollback in production
+
+2. **Backup Integrity:**
+   - Verify backup partition firmware signature before rollback
+   - Check backup firmware version is not too old
+   - Validate backup firmware is compatible with hardware
+
+3. **Safe Boot Protection:**
+   - Limit safe boot to admin users
+   - Auto-disable safe boot after successful backup boot
+   - Prevent boot loop by limiting consecutive safe boots
+
+---
+
 ## Phase 2 OTA Enhancements - Automatic Update Checking
 
 ### Overview

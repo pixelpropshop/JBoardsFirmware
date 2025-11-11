@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { systemService } from '../services/systemService';
 import { firmwareService } from '../services/firmwareService';
 import type { SystemInfo, FirmwareUpdateProgress } from '../types/system';
-import type { UpdateCheckResult } from '../types/firmware';
+import type { UpdateCheckResult, OTAStatus } from '../types/firmware';
 import { calculateSHA256 } from '../utils/crypto';
 
 export default function About() {
@@ -20,6 +20,7 @@ export default function About() {
   const [showAllVersions, setShowAllVersions] = useState(false);
   const [downloadingFirmware, setDownloadingFirmware] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [otaStatus, setOtaStatus] = useState<OTAStatus | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
     message: string;
@@ -30,6 +31,7 @@ export default function About() {
 
   useEffect(() => {
     loadSystemInfo();
+    loadOtaStatus();
   }, []);
 
   const loadSystemInfo = async () => {
@@ -41,6 +43,15 @@ export default function About() {
       console.error('Failed to load system info:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadOtaStatus = async () => {
+    try {
+      const status = await firmwareService.getOTAStatus();
+      setOtaStatus(status);
+    } catch (error) {
+      console.error('Failed to load OTA status:', error);
     }
   };
 
@@ -327,6 +338,67 @@ export default function About() {
     }
   };
 
+  const handleRollback = () => {
+    setConfirmDialog({
+      title: 'Rollback Firmware',
+      message: `Roll back to previous firmware version ${otaStatus?.backupVersion || ''}? Device will restart.`,
+      dangerous: true,
+      onConfirm: performRollback,
+    });
+  };
+
+  const performRollback = async () => {
+    try {
+      setActionMessage(null);
+      const result = await firmwareService.rollbackFirmware();
+      
+      if (result.success) {
+        setActionMessage({ type: 'success', text: result.message });
+        setTimeout(() => {
+          window.location.reload();
+        }, 3000);
+      } else {
+        setActionMessage({ type: 'error', text: result.message || 'Failed to rollback firmware' });
+      }
+    } catch (error) {
+      setActionMessage({ type: 'error', text: 'Failed to rollback to previous firmware' });
+      console.error(error);
+    }
+  };
+
+  const handleMarkBootValid = async () => {
+    try {
+      setActionMessage(null);
+      const result = await firmwareService.markBootValid();
+      
+      if (result.success) {
+        setActionMessage({ type: 'success', text: 'Firmware validated successfully' });
+        await loadOtaStatus();
+      } else {
+        setActionMessage({ type: 'error', text: result.message || 'Failed to validate firmware' });
+      }
+    } catch (error) {
+      setActionMessage({ type: 'error', text: 'Failed to validate firmware boot' });
+      console.error(error);
+    }
+  };
+
+  const handleEnableSafeBoot = async () => {
+    try {
+      setActionMessage(null);
+      const result = await firmwareService.enableSafeBoot();
+      
+      if (result.success) {
+        setActionMessage({ type: 'success', text: result.message });
+      } else {
+        setActionMessage({ type: 'error', text: result.message || 'Failed to enable safe boot' });
+      }
+    } catch (error) {
+      setActionMessage({ type: 'error', text: 'Failed to enable safe boot mode' });
+      console.error(error);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -548,6 +620,84 @@ export default function About() {
             )}
           </div>
         </div>
+
+        {/* Firmware Backup & Rollback */}
+        {otaStatus && (
+          <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60">
+            <h2 className="text-lg font-medium mb-4">Firmware Backup & Recovery</h2>
+            
+            <div className="space-y-3">
+              <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                <dl className="grid grid-cols-2 gap-3 text-sm">
+                  <dt className="text-gray-500">Current Version</dt>
+                  <dd className="font-medium">{otaStatus.currentVersion}</dd>
+                  
+                  <dt className="text-gray-500">Current Partition</dt>
+                  <dd className="font-mono text-xs">{otaStatus.currentPartition}</dd>
+                  
+                  {otaStatus.rollbackAvailable && (
+                    <>
+                      <dt className="text-gray-500">Backup Version</dt>
+                      <dd className="font-medium text-blue-600 dark:text-blue-400">{otaStatus.backupVersion}</dd>
+                      
+                      <dt className="text-gray-500">Backup Partition</dt>
+                      <dd className="font-mono text-xs">{otaStatus.backupPartition}</dd>
+                    </>
+                  )}
+                  
+                  <dt className="text-gray-500">Boot Count</dt>
+                  <dd>{otaStatus.bootCount}</dd>
+                  
+                  <dt className="text-gray-500">Last Boot</dt>
+                  <dd className={otaStatus.lastBootSuccess ? 'text-green-600' : 'text-red-600'}>
+                    {otaStatus.lastBootSuccess ? '✓ Success' : '✗ Failed'}
+                  </dd>
+                </dl>
+              </div>
+
+              {otaStatus.rollbackAvailable ? (
+                <div className="space-y-2">
+                  <button
+                    onClick={handleRollback}
+                    className="w-full px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition-colors"
+                  >
+                    ⏮️ Rollback to v{otaStatus.backupVersion}
+                  </button>
+                  
+                  {!otaStatus.safeBoot && (
+                    <button
+                      onClick={handleEnableSafeBoot}
+                      className="w-full px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-700 text-white transition-colors"
+                    >
+                      🛡️ Enable Safe Boot (Test Backup)
+                    </button>
+                  )}
+                  
+                  {otaStatus.bootCount <= 3 && (
+                    <button
+                      onClick={handleMarkBootValid}
+                      className="w-full px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors"
+                    >
+                      ✓ Confirm Firmware Working
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 italic">
+                  No backup firmware available. A backup will be created after your next firmware update.
+                </p>
+              )}
+
+              {otaStatus.safeBoot && (
+                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    ⚠️ Safe boot enabled. Device will boot from backup firmware on next restart.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Firmware Update - Manual Upload */}
         <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60">
