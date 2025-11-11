@@ -2669,6 +2669,529 @@ void scanDirectory(const char* path, JsonArray& files) {
 
 ---
 
+## System Management API Endpoints
+
+### 60. Get System Stats
+
+**Endpoint:** `GET /api/system/stats`
+
+**Description:** Retrieve complete system statistics including info, health, LED channels, and now playing.
+
+**Response:**
+```json
+{
+  "info": {
+    "productName": "JSense Board",
+    "hostname": "jsense-board",
+    "firmwareVersion": "1.0.0",
+    "buildDate": "2025-01-10",
+    "buildTime": "14:30:00",
+    "chipModel": "ESP32-S3",
+    "chipRevision": 1,
+    "flashSize": 8388608,
+    "flashSpeed": 80,
+    "cpuFrequency": 240,
+    "macAddressWiFi": "24:6F:28:XX:XX:XX",
+    "macAddressAP": "24:6F:28:XX:XX:YY"
+  },
+  "health": {
+    "uptimeSeconds": 86400,
+    "heapTotal": 327680,
+    "heapFree": 131072,
+    "heapUsed": 196608,
+    "heapMaxAlloc": 98304,
+    "cpuTemperature": 45.5,
+    "freeSketchSpace": 6291456,
+    "sketchSize": 2097152
+  },
+  "ledChannels": [
+    {
+      "id": 1,
+      "name": "Channel 1",
+      "enabled": true,
+      "pixelCount": 300,
+      "pixelType": "WS2812B",
+      "dataPin": 16,
+      "fps": 60,
+      "status": "active",
+      "currentEffect": "Rainbow Chase"
+    }
+  ],
+  "nowPlaying": {
+    "type": "effect",
+    "name": "Rainbow Chase",
+    "id": 5,
+    "duration": 0,
+    "elapsed": 0,
+    "loop": true,
+    "channels": [1]
+  }
+}
+```
+
+**Notes:**
+- Combines all system data in one call for efficiency
+- Used by Dashboard page for comprehensive display
+- Reduced API calls compared to fetching separately
+
+---
+
+### 61. Get System Info
+
+**Endpoint:** `GET /api/system/info`
+
+**Description:** Retrieve system and hardware information.
+
+**Response:**
+```json
+{
+  "productName": "JSense Board",
+  "hostname": "jsense-board",
+  "firmwareVersion": "1.0.0",
+  "buildDate": "2025-01-10",
+  "buildTime": "14:30:00",
+  "chipModel": "ESP32-S3",
+  "chipRevision": 1,
+  "flashSize": 8388608,
+  "flashSpeed": 80,
+  "cpuFrequency": 240,
+  "macAddressWiFi": "24:6F:28:XX:XX:XX",
+  "macAddressAP": "24:6F:28:XX:XX:YY"
+}
+```
+
+**Notes:**
+- Static hardware information
+- Does not change during runtime (except hostname)
+- Used by About page for product information display
+
+---
+
+### 62. Get System Health
+
+**Endpoint:** `GET /api/system/health`
+
+**Description:** Retrieve real-time system health metrics.
+
+**Response:**
+```json
+{
+  "uptimeSeconds": 86400,
+  "heapTotal": 327680,
+  "heapFree": 131072,
+  "heapUsed": 196608,
+  "heapMaxAlloc": 98304,
+  "cpuTemperature": 45.5,
+  "freeSketchSpace": 6291456,
+  "sketchSize": 2097152
+}
+```
+
+**Notes:**
+- Real-time metrics that change during operation
+- heapTotal/Free/Used in bytes
+- cpuTemperature in Celsius (optional, may not be available on all boards)
+- Used for memory usage visualization and health monitoring
+
+---
+
+### 63. Get LED Channels
+
+**Endpoint:** `GET /api/system/channels`
+
+**Description:** Retrieve LED channel configuration and status.
+
+**Response:**
+```json
+[
+  {
+    "id": 1,
+    "name": "Channel 1",
+    "enabled": true,
+    "pixelCount": 300,
+    "pixelType": "WS2812B",
+    "dataPin": 16,
+    "fps": 60,
+    "status": "active",
+    "currentEffect": "Rainbow Chase"
+  },
+  {
+    "id": 2,
+    "name": "Channel 2",
+    "enabled": false,
+    "pixelCount": 150,
+    "pixelType": "WS2811",
+    "dataPin": 17,
+    "fps": 60,
+    "status": "idle"
+  }
+]
+```
+
+**Notes:**
+- status: 'active' | 'idle' | 'error'
+- currentEffect: Name of active effect (if any)
+- Used for channel monitoring on Dashboard
+
+---
+
+### 64. Get Now Playing
+
+**Endpoint:** `GET /api/system/now-playing`
+
+**Description:** Retrieve currently playing effect or sequence information.
+
+**Response:**
+```json
+{
+  "type": "effect",
+  "name": "Rainbow Chase",
+  "id": 5,
+  "duration": 120,
+  "elapsed": 45,
+  "loop": true,
+  "channels": [1, 2]
+}
+```
+
+**Response (Idle):**
+```json
+{
+  "type": "idle"
+}
+```
+
+**Notes:**
+- type: 'effect' | 'sequence' | 'idle'
+- duration/elapsed in seconds (0 if infinite)
+- Used for Now Playing card on Dashboard
+- Shows progress bar if duration > 0
+
+---
+
+### 65. Upload Firmware Update
+
+**Endpoint:** `POST /api/system/firmware/update`
+
+**Description:** Upload and install firmware update (.bin file).
+
+**Request:** `multipart/form-data`
+
+**Form Fields:**
+- `firmware`: Firmware binary file (.bin extension)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Firmware uploaded successfully. Device will restart.",
+  "progress": 100,
+  "newVersion": "1.1.0"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Invalid firmware file or upload failed"
+}
+```
+
+**Notes:**
+- File must have .bin extension
+- OTA update process - device restarts automatically
+- Progress can be tracked during upload (0-100%)
+- Validate firmware before flashing
+- Backup current firmware if possible
+- Maximum file size: 2MB (typical firmware size)
+
+**ESP32 OTA Implementation:**
+```cpp
+// Handle firmware upload
+server.on("/api/system/firmware/update", HTTP_POST,
+  [](AsyncWebServerRequest *request) {
+    AsyncWebServerResponse *response = request->beginResponse(200, "application/json", 
+      "{\"success\":true,\"message\":\"Update complete. Restarting...\"}");
+    response->addHeader("Connection", "close");
+    request->send(response);
+    delay(1000);
+    ESP.restart();
+  },
+  [](AsyncWebServerRequest *request, String filename, size_t index, 
+     uint8_t *data, size_t len, bool final) {
+    if (!index) {
+      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+        Update.printError(Serial);
+      }
+    }
+    if (Update.write(data, len) != len) {
+      Update.printError(Serial);
+    }
+    if (final) {
+      if (Update.end(true)) {
+        Serial.println("Update Success");
+      }
+    }
+  }
+);
+```
+
+---
+
+### 66. Restart Device
+
+**Endpoint:** `POST /api/system/restart`
+
+**Description:** Restart the ESP32 device.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Device restarting..."
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Restart failed"
+}
+```
+
+**Notes:**
+- Device disconnects after ~1-2 seconds
+- Frontend should show reconnection countdown
+- All connections will be lost temporarily
+- Device should be accessible again in 10-15 seconds
+
+**ESP32 Implementation:**
+```cpp
+server.on("/api/system/restart", HTTP_POST, [](AsyncWebServerRequest *request){
+  AsyncWebServerResponse *response = request->beginResponse(200, "application/json",
+    "{\"success\":true,\"message\":\"Device restarting...\"}");
+  response->addHeader("Connection", "close");
+  request->send(response);
+  delay(1000);
+  ESP.restart();
+});
+```
+
+---
+
+### 67. Factory Reset
+
+**Endpoint:** `POST /api/system/factory-reset`
+
+**Description:** Reset device to factory defaults and restart.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Factory reset initiated. Device will restart with default settings."
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Factory reset failed"
+}
+```
+
+**Notes:**
+- Erases all user settings and configurations
+- WiFi credentials cleared
+- Saved effects/sequences deleted
+- Network profiles cleared
+- Device returns to initial setup state
+- Captive portal will appear on next connection
+- **IRREVERSIBLE - use with extreme caution**
+
+**ESP32 Implementation:**
+```cpp
+server.on("/api/system/factory-reset", HTTP_POST, [](AsyncWebServerRequest *request){
+  // Clear preferences/EEPROM
+  preferences.clear();
+  
+  // Delete all config files
+  SD.remove("/config/wifi.json");
+  SD.remove("/config/network.json");
+  // ... delete other config files
+  
+  AsyncWebServerResponse *response = request->beginResponse(200, "application/json",
+    "{\"success\":true,\"message\":\"Factory reset complete. Restarting...\"}");
+  response->addHeader("Connection", "close");
+  request->send(response);
+  delay(1000);
+  ESP.restart();
+});
+```
+
+---
+
+### 68. Export Configuration
+
+**Endpoint:** `GET /api/system/export-config`
+
+**Description:** Export device configuration as downloadable JSON file.
+
+**Response:** Binary JSON file download
+
+**Headers:**
+```
+Content-Type: application/json
+Content-Disposition: attachment; filename="jsense-config-2025-01-10.json"
+Content-Length: <file size>
+```
+
+**Example Configuration:**
+```json
+{
+  "version": "1.0.0",
+  "exportedAt": "2025-01-10T15:30:00Z",
+  "system": {
+    "hostname": "jsense-board",
+    "productName": "JSense Board"
+  },
+  "network": {
+    "wifi": {
+      "ssid": "MyNetwork",
+      "dhcp": true
+    },
+    "ap": {
+      "ssid": "JSense-AP",
+      "channel": 6
+    }
+  },
+  "channels": [
+    {
+      "id": 1,
+      "name": "Channel 1",
+      "pixelCount": 300,
+      "pixelType": "WS2812B"
+    }
+  ],
+  "effects": [...],
+  "sequences": [...]
+}
+```
+
+**Notes:**
+- Does NOT include sensitive data (passwords, API keys)
+- Used for backup and migration to new device
+- Filename includes date for organization
+- Can be imported later (future feature)
+- JSON format for human-readable backup
+
+---
+
+### 69. Clear System Logs
+
+**Endpoint:** `POST /api/system/clear-logs`
+
+**Description:** Clear all system log files.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "System logs cleared successfully"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Failed to clear logs"
+}
+```
+
+**Notes:**
+- Deletes all log files from SD card
+- Frees up storage space
+- Cannot be undone
+- Creates new empty log file after clearing
+- Does not affect system operation
+
+**ESP32 Implementation:**
+```cpp
+server.on("/api/system/clear-logs", HTTP_POST, [](AsyncWebServerRequest *request){
+  // Delete log files
+  SD.remove("/logs/system.log");
+  SD.remove("/logs/error.log");
+  SD.remove("/logs/debug.log");
+  
+  // Create new empty log file
+  File logFile = SD.open("/logs/system.log", FILE_WRITE);
+  logFile.close();
+  
+  request->send(200, "application/json",
+    "{\"success\":true,\"message\":\"Logs cleared successfully\"}");
+});
+```
+
+---
+
+## System Management Implementation Notes
+
+### Dashboard Auto-Refresh
+
+- Poll `/api/system/stats` every 5 seconds for real-time updates
+- Use efficient single API call instead of multiple requests
+- Consider WebSocket for push updates (future enhancement)
+
+### Memory Management
+
+- Monitor heap usage to prevent crashes
+- Show warnings when memory usage > 80%
+- Automatic garbage collection considerations
+- Heap fragmentation monitoring
+
+### Temperature Monitoring
+
+- Optional feature - not all ESP32 boards have temperature sensor
+- Normal range: 30-70°C
+- Warning threshold: > 75°C
+- Critical threshold: > 85°C (should throttle or shutdown)
+
+### Firmware Update Safety
+
+1. **Validation:**
+   - Check file size (must fit in flash)
+   - Verify magic bytes and firmware signature
+   - Compare version numbers
+   
+2. **Backup:**
+   - Keep previous firmware in backup partition
+   - Rollback capability on boot failure
+   
+3. **Progress:**
+   - Report upload progress percentage
+   - Show estimated time remaining
+   - Handle interruptions gracefully
+
+### Factory Reset Confirmation
+
+- Frontend requires double confirmation
+- Clear warning about data loss
+- No way to recover after reset
+- Consider "soft reset" option (keeps WiFi credentials)
+
+### Configuration Export Uses
+
+- Device migration to new hardware
+- Backup before firmware updates
+- Sharing configurations between devices
+- Troubleshooting and support
+
+---
+
 ## Future Enhancements
 
 1. **WebSocket Support:**
