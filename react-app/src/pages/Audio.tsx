@@ -386,11 +386,7 @@ export default function Audio() {
                 <div className="flex gap-2 ml-4 flex-shrink-0">
                   <button
                     onClick={() => handlePlay(file.filename)}
-                    className={`p-2 rounded transition-colors ${
-                      currentlyPlaying === file.filename && isPlaying
-                        ? 'text-brand-500 bg-brand-500/10'
-                        : 'text-gray-500 hover:bg-gray-500/10'
-                    }`}
+                    className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                     title={currentlyPlaying === file.filename && isPlaying ? 'Pause' : 'Play'}
                   >
                     {currentlyPlaying === file.filename && isPlaying ? (
@@ -405,7 +401,7 @@ export default function Audio() {
                   </button>
                   <button
                     onClick={() => handleDelete(file.filename)}
-                    className="p-2 rounded text-red-500 hover:bg-red-500/10 transition-colors"
+                    className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
                     title="Delete file"
                   >
                     <svg
