@@ -1,0 +1,52 @@
+# JSense Board Project - Cline Rules
+
+## Token Management (CRITICAL)
+- Monitor token usage constantly
+- At 70% usage: Be concise, batch operations, reduce verbosity
+- At 85% usage: IMMEDIATELY use /newtask with full context - DO NOT ASK
+- Never end responses with conversational fluff ("Great!", "Certainly!")
+
+## Response Style
+- Direct and technical only
+- No pleasantries or filler words
+- Lead with what was done, not what will be done
+- Use bullet points over paragraphs
+- Don't repeat information from tool outputs
+
+## Tool Usage Optimization
+- Use replace_in_file for targeted edits (not write_to_file for small changes)
+- Combine multiple edits to same file in ONE replace_in_file call
+- Don't read files you just created (you have the content)
+- Batch independent operations when possible
+- Order SEARCH/REPLACE blocks as they appear in file
+
+## Task Breakdown
+- Break tasks when >5-7 steps remain OR token usage >60%
+- Use /newtask with comprehensive context:
+  * Specific files/changes completed
+  * Prioritized remaining work
+  * Technical decisions made
+  * Direct quotes from user requirements
+- Use descriptive task names, not generic ones
+
+## Code Standards (JSense Board)
+- React + TypeScript + Tailwind CSS
+- ESP32 backend (mock data in dev)
+- Mobile-first, dark mode required
+- Follow existing file patterns
+- Update API_SPECIFICATION.md for new endpoints
+- All APIs need mock fallback
+
+## File Organization
+- Components: /src/components/
+- Pages: /src/pages/
+- Services: /src/services/
+- Types: /src/types/
+- Utils: /src/utils/
+
+## Before Completing Tasks
+- Verify TypeScript compiles
+- Check all imports resolved
+- Follow project patterns
+- Update API docs if needed
+- Token usage <85% or used /newtask
