@@ -3253,6 +3253,165 @@ server.on("/api/system/clear-logs", HTTP_POST, [](AsyncWebServerRequest *request
 
 ---
 
+## Phase 2 OTA Enhancements - Automatic Update Checking
+
+### Overview
+
+Phase 2 adds automatic firmware update checking from a GitHub repository. This is implemented entirely on the frontend - the ESP32 firmware does not need any changes. The frontend fetches firmware metadata from GitHub, compares versions, and downloads firmware files directly from GitHub before uploading to the device.
+
+### GitHub Repository Structure
+
+Firmware updates are hosted at: `https://github.com/pixelpropshop/JBoardsFirmware`
+
+**Expected Structure:**
+```
+JBoardsFirmware/
+├── JSense/
+│   ├── manifest.json          # Latest stable version info
+│   ├── versions.json          # List of all available versions
+│   └── versions/
+│       ├── 1.0.0/
+│       │   ├── firmware.bin
+│       │   └── info.json     # Version-specific metadata
+│       ├── 1.1.0/
+│       │   ├── firmware.bin
+│       │   └── info.json
+│       └── 1.2.0/
+│           ├── firmware.bin
+│           └── info.json
+├── JBoard2/                    # Additional board models...
+│   └── ...
+```
+
+### manifest.json Format
+
+```json
+{
+  "latestVersion": "1.2.0",
+  "latestUrl": "versions/1.2.0/firmware.bin",
+  "checksum": "abc123def456..."
+}
+```
+
+### versions.json Format
+
+```json
+{
+  "versions": [
+    {
+      "version": "1.2.0",
+      "buildDate": "2025-01-15",
+      "stable": true,
+      "changelog": "- Fixed WiFi bug\n- Added new effects\n- Performance improvements",
+      "checksum": "abc123def456...",
+      "fileSize": 2097152,
+      "minHardwareVersion": "1.0"
+    },
+    {
+      "version": "1.1.0",
+      "buildDate": "2025-01-10",
+      "stable": true,
+      "changelog": "- Previous stable release",
+      "checksum": "def789ghi012...",
+      "fileSize": 2048000
+    }
+  ]
+}
+```
+
+### Frontend Update Check Flow
+
+1. **User clicks "Check for Updates"**
+   - Frontend fetches `manifest.json` and `versions.json` from GitHub
+   - Compares current firmware version with latest version
+   - Displays update notification if newer version available
+
+2. **User views all versions**
+   - Shows complete version history from `versions.json`
+   - Indicates current version, newer versions, and older versions
+   - Displays changelog for each version
+
+3. **User selects version to install**
+   - Frontend downloads firmware.bin from GitHub using XMLHttpRequest
+   - Shows download progress (separate from upload progress)
+   - Verifies SHA256 checksum if provided in versions.json
+   - Converts downloaded blob to File object
+
+4. **Firmware upload to device**
+   - Uses existing `/api/system/firmware/update` endpoint
+   - All Phase 1 features apply (verification, progress, error handling)
+   - Device restarts after successful installation
+
+### GitHub URLs (Raw Content)
+
+- Manifest: `https://raw.githubusercontent.com/pixelpropshop/JBoardsFirmware/main/{boardName}/manifest.json`
+- Versions: `https://raw.githubusercontent.com/pixelpropshop/JBoardsFirmware/main/{boardName}/versions.json`
+- Firmware: `https://raw.githubusercontent.com/pixelpropshop/JBoardsFirmware/main/{boardName}/versions/{version}/firmware.bin`
+
+### Version Comparison
+
+Frontend uses semantic versioning (x.y.z) for comparison:
+- Splits version string by dots
+- Compares each segment numerically
+- Returns -1 (older), 0 (equal), or 1 (newer)
+
+### UI Features
+
+**Update Check Result Display:**
+- Current version vs. latest version
+- "Update Available" badge if newer version exists
+- Latest release notes/changelog
+- "Download and Install" button for one-click update
+
+**All Versions View:**
+- Expandable list showing all available versions
+- Version badges: "Current" (blue), "New" (green), "Older" (gray)
+- "Stable" badge for stable releases
+- Build date for each version
+- Individual install buttons for each version (except current)
+
+**Download Progress:**
+- Separate progress bar for GitHub download
+- Shows percentage, bytes downloaded, total size
+- Smooth transition from download to upload stages
+
+### Error Handling
+
+- **Network errors:** "Failed to check for updates. Please check your internet connection."
+- **Invalid manifest:** "Update repository format error"
+- **Download failure:** "Failed to download firmware from GitHub"
+- **Checksum mismatch:** "Downloaded firmware checksum verification failed"
+- **Version not found:** "Selected firmware version no longer available"
+
+### Security Considerations
+
+1. **HTTPS Only:** All GitHub requests use HTTPS
+2. **Checksum Verification:** SHA256 verification before upload (if provided)
+3. **Version Validation:** Semantic version format validation
+4. **File Size Limits:** Enforce maximum firmware file size
+5. **Public Repository:** No authentication required, uses GitHub raw content URLs
+
+### Backwards Compatibility
+
+- Manual firmware upload remains available
+- Devices without internet access can still be updated manually
+- Works alongside existing Phase 1 features
+- No changes required to ESP32 firmware
+
+### Repository Management
+
+**For Firmware Maintainers:**
+1. Build firmware binary
+2. Calculate SHA256 checksum: `sha256sum firmware.bin`
+3. Create version directory: `versions/x.y.z/`
+4. Upload firmware.bin to version directory
+5. Create info.json with metadata
+6. Update versions.json with new version entry
+7. Update manifest.json if this is the new latest stable
+8. Commit and push to GitHub main branch
+
+---
+
 ## Future Enhancements
 
 1. **WebSocket Support:**

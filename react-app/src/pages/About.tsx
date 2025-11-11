@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { systemService } from '../services/systemService';
+import { firmwareService } from '../services/firmwareService';
 import type { SystemInfo, FirmwareUpdateProgress } from '../types/system';
-import { calculateSHA256, formatHash } from '../utils/crypto';
+import type { UpdateCheckResult } from '../types/firmware';
+import { calculateSHA256 } from '../utils/crypto';
 
 export default function About() {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
@@ -13,6 +15,11 @@ export default function About() {
   const [expectedChecksum, setExpectedChecksum] = useState('');
   const [calculatingChecksum, setCalculatingChecksum] = useState(false);
   const [fileChecksum, setFileChecksum] = useState('');
+  const [checkingForUpdates, setCheckingForUpdates] = useState(false);
+  const [updateCheckResult, setUpdateCheckResult] = useState<UpdateCheckResult | null>(null);
+  const [showAllVersions, setShowAllVersions] = useState(false);
+  const [downloadingFirmware, setDownloadingFirmware] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
     message: string;
@@ -20,7 +27,6 @@ export default function About() {
     dangerous?: boolean;
     secondConfirm?: string;
   } | null>(null);
-  const [pendingFile, setPendingFile] = useState<{ file: File; input: HTMLInputElement } | null>(null);
 
   useEffect(() => {
     loadSystemInfo();
@@ -35,6 +41,112 @@ export default function About() {
       console.error('Failed to load system info:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCheckForUpdates = async () => {
+    if (!systemInfo) return;
+
+    try {
+      setCheckingForUpdates(true);
+      setActionMessage(null);
+      
+      const result = await firmwareService.checkForUpdates(
+        systemInfo.productName,
+        systemInfo.firmwareVersion
+      );
+      
+      setUpdateCheckResult(result);
+      
+      if (result.updateAvailable) {
+        setActionMessage({
+          type: 'success',
+          text: `Update available! Latest version: ${result.latestVersion}`,
+        });
+      } else {
+        setActionMessage({
+          type: 'success',
+          text: 'You have the latest firmware version.',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to check for updates:', error);
+      setActionMessage({
+        type: 'error',
+        text: 'Failed to check for updates. Please check your internet connection.',
+      });
+    } finally {
+      setCheckingForUpdates(false);
+    }
+  };
+
+  const handleDownloadAndInstall = async (version: string) => {
+    if (!systemInfo) return;
+
+    setConfirmDialog({
+      title: 'Download and Install Firmware',
+      message: `Download and install firmware version ${version}? Device will restart after update.`,
+      onConfirm: () => performDownloadAndInstall(version),
+    });
+  };
+
+  const performDownloadAndInstall = async (version: string) => {
+    if (!systemInfo) return;
+
+    try {
+      setDownloadingFirmware(true);
+      setDownloadProgress(0);
+      setActionMessage({ type: 'success', text: 'Downloading firmware from GitHub...' });
+
+      // Download firmware from GitHub
+      const blob = await firmwareService.downloadFirmware(
+        systemInfo.productName,
+        version,
+        (progress) => {
+          const percent = Math.round((progress.loaded / progress.total) * 100);
+          setDownloadProgress(percent);
+        }
+      );
+
+      setActionMessage({ type: 'success', text: 'Download complete. Installing firmware...' });
+
+      // Convert blob to File
+      const file = new File([blob], `firmware-${version}.bin`, { type: 'application/octet-stream' });
+
+      // Get checksum if available
+      const versionInfo = updateCheckResult?.allVersions?.find((v) => v.version === version);
+      const checksum = versionInfo?.checksum;
+
+      // Upload firmware using existing flow
+      setUploadingFirmware(true);
+      setUploadProgress(null);
+
+      const result = await systemService.uploadFirmware(
+        file,
+        (progress) => {
+          setUploadProgress(progress);
+        },
+        checksum
+      );
+
+      if (result.success) {
+        setActionMessage({ type: 'success', text: result.message });
+        
+        // Device will restart
+        setTimeout(() => {
+          window.location.reload();
+        }, 3000);
+      } else {
+        setActionMessage({ type: 'error', text: result.message || result.error || 'Firmware update failed' });
+      }
+    } catch (error) {
+      setActionMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to download firmware' });
+      console.error(error);
+    } finally {
+      setDownloadingFirmware(false);
+      setDownloadProgress(0);
+      setUploadingFirmware(false);
+      setUploadProgress(null);
     }
   };
 
@@ -62,7 +174,6 @@ export default function About() {
     }
 
     // Show confirmation dialog
-    setPendingFile({ file, input: event.target });
     setConfirmDialog({
       title: 'Upload Firmware',
       message: `Upload firmware "${file.name}" (${systemService.formatBytes(file.size)})? Device will restart after update.`,
@@ -109,7 +220,6 @@ export default function About() {
     } finally {
       setUploadingFirmware(false);
       setUploadProgress(null);
-      setPendingFile(null);
     }
   };
 
@@ -303,9 +413,145 @@ export default function About() {
           </div>
         )}
 
-        {/* Firmware Update */}
+        {/* Firmware Update - Check for Updates */}
         <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60">
           <h2 className="text-lg font-medium mb-4">Firmware Update</h2>
+          
+          <div className="space-y-3">
+            <button
+              onClick={handleCheckForUpdates}
+              disabled={checkingForUpdates || !systemInfo}
+              className={`w-full px-4 py-2 rounded-lg text-white transition-colors ${
+                checkingForUpdates
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-green-600 hover:bg-green-700'
+              }`}
+            >
+              {checkingForUpdates ? 'Checking for Updates...' : '🔍 Check for Updates'}
+            </button>
+
+            {updateCheckResult && (
+              <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Current Version: {updateCheckResult.currentVersion}
+                    </p>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Latest Version: {updateCheckResult.latestVersion}
+                    </p>
+                  </div>
+                  {updateCheckResult.updateAvailable && (
+                    <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full">
+                      Update Available
+                    </span>
+                  )}
+                </div>
+
+                {updateCheckResult.latestStable && updateCheckResult.updateAvailable && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Latest Release Notes:
+                    </p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-line">
+                      {updateCheckResult.latestStable.changelog}
+                    </p>
+                    <button
+                      onClick={() => handleDownloadAndInstall(updateCheckResult.latestVersion)}
+                      disabled={downloadingFirmware || uploadingFirmware}
+                      className="mt-2 w-full px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white transition-colors"
+                    >
+                      📥 Download and Install v{updateCheckResult.latestVersion}
+                    </button>
+                  </div>
+                )}
+
+                {updateCheckResult.allVersions && updateCheckResult.allVersions.length > 1 && (
+                  <div>
+                    <button
+                      onClick={() => setShowAllVersions(!showAllVersions)}
+                      className="text-sm text-brand-600 hover:underline"
+                    >
+                      {showAllVersions ? '▼' : '▶'} View All Versions ({updateCheckResult.allVersions.length})
+                    </button>
+
+                    {showAllVersions && (
+                      <div className="mt-2 space-y-2 max-h-64 overflow-y-auto">
+                        {updateCheckResult.allVersions.map((version) => {
+                          const badge = firmwareService.formatVersionBadge(
+                            version,
+                            updateCheckResult.currentVersion
+                          );
+                          return (
+                            <div
+                              key={version.version}
+                              className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-sm">v{version.version}</span>
+                                  {badge.text && (
+                                    <span
+                                      className={`px-2 py-0.5 text-xs rounded-full ${
+                                        badge.color === 'blue'
+                                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
+                                          : badge.color === 'green'
+                                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                      }`}
+                                    >
+                                      {badge.text}
+                                    </span>
+                                  )}
+                                  {version.stable && (
+                                    <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200">
+                                      Stable
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-xs text-gray-500">{version.buildDate}</span>
+                              </div>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2 whitespace-pre-line">
+                                {version.changelog}
+                              </p>
+                              {badge.text !== 'Current' && (
+                                <button
+                                  onClick={() => handleDownloadAndInstall(version.version)}
+                                  disabled={downloadingFirmware || uploadingFirmware}
+                                  className="w-full px-3 py-1.5 rounded-lg text-sm bg-brand-600 hover:bg-brand-700 text-white transition-colors disabled:bg-gray-400"
+                                >
+                                  Install v{version.version}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {downloadingFirmware && (
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Downloading firmware from GitHub... {downloadProgress}%
+                </p>
+                <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-600 transition-all duration-300"
+                    style={{ width: `${downloadProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Firmware Update - Manual Upload */}
+        <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60">
+          <h2 className="text-lg font-medium mb-4">Manual Firmware Upload</h2>
           
           <div className="space-y-3">
             <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -554,7 +800,6 @@ export default function About() {
               <button
                 onClick={() => {
                   setConfirmDialog(null);
-                  setPendingFile(null);
                 }}
                 className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
               >
