@@ -10,6 +10,7 @@ import Sensors from './pages/Sensors'
 import Network from './pages/Network'
 import Files from './pages/Files'
 import About from './pages/About'
+import Settings from './pages/Settings'
 import CaptivePortal from './pages/CaptivePortal'
 import CaptivePortalSetup from './pages/CaptivePortalSetup'
 import JBoardNetwork from './pages/JBoardNetwork'
@@ -37,6 +38,7 @@ function App() {
         <Route path="jboard-network/:mac" element={<JBoardDeviceDetails />} />
         <Route path="files" element={<Files />} />
         <Route path="about" element={<About />} />
+        <Route path="settings" element={<Settings />} />
       </Route>
       </Routes>
     </BoardProvider>
