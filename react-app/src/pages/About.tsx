@@ -8,6 +8,14 @@ export default function About() {
   const [uploadingFirmware, setUploadingFirmware] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    dangerous?: boolean;
+    secondConfirm?: string;
+  } | null>(null);
+  const [pendingFile, setPendingFile] = useState<{ file: File; input: HTMLInputElement } | null>(null);
 
   useEffect(() => {
     loadSystemInfo();
@@ -36,11 +44,16 @@ export default function About() {
       return;
     }
 
-    if (!confirm(`Upload firmware "${file.name}"? Device will restart after update.`)) {
-      event.target.value = '';
-      return;
-    }
+    // Show confirmation dialog
+    setPendingFile({ file, input: event.target });
+    setConfirmDialog({
+      title: 'Upload Firmware',
+      message: `Upload firmware "${file.name}"? Device will restart after update.`,
+      onConfirm: () => performFirmwareUpload(file, event.target),
+    });
+  };
 
+  const performFirmwareUpload = async (file: File, input: HTMLInputElement) => {
     try {
       setUploadingFirmware(true);
       setUploadProgress(0);
@@ -66,18 +79,25 @@ export default function About() {
         setActionMessage({ type: 'error', text: result.message || 'Firmware update failed' });
       }
 
-      event.target.value = '';
+      input.value = '';
     } catch (error) {
       setActionMessage({ type: 'error', text: 'Failed to upload firmware' });
       console.error(error);
     } finally {
       setUploadingFirmware(false);
+      setPendingFile(null);
     }
   };
 
-  const handleRestart = async () => {
-    if (!confirm('Restart the device? You will lose connection temporarily.')) return;
+  const handleRestart = () => {
+    setConfirmDialog({
+      title: 'Restart Device',
+      message: 'Restart the device? You will lose connection temporarily.',
+      onConfirm: performRestart,
+    });
+  };
 
+  const performRestart = async () => {
     try {
       setActionMessage(null);
       const result = await systemService.restartDevice();
@@ -97,10 +117,17 @@ export default function About() {
     }
   };
 
-  const handleFactoryReset = async () => {
-    if (!confirm('⚠️ FACTORY RESET - This will erase ALL settings and configurations. Are you sure?')) return;
-    if (!confirm('⚠️ FINAL WARNING - This action cannot be undone. Proceed with factory reset?')) return;
+  const handleFactoryReset = () => {
+    setConfirmDialog({
+      title: '⚠️ Factory Reset',
+      message: 'This will erase ALL settings and configurations. Are you sure?',
+      dangerous: true,
+      secondConfirm: '⚠️ FINAL WARNING - This action cannot be undone. Proceed with factory reset?',
+      onConfirm: performFactoryReset,
+    });
+  };
 
+  const performFactoryReset = async () => {
     try {
       setActionMessage(null);
       const result = await systemService.factoryReset();
@@ -142,9 +169,15 @@ export default function About() {
     }
   };
 
-  const handleClearLogs = async () => {
-    if (!confirm('Clear all system logs?')) return;
+  const handleClearLogs = () => {
+    setConfirmDialog({
+      title: 'Clear System Logs',
+      message: 'Clear all system logs?',
+      onConfirm: performClearLogs,
+    });
+  };
 
+  const performClearLogs = async () => {
     try {
       setActionMessage(null);
       const result = await systemService.clearLogs();
@@ -336,6 +369,22 @@ export default function About() {
           
           <div className="space-y-2">
             <a
+              href="https://GetJBoards.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-brand-600 hover:underline"
+            >
+              🌐 GetJBoards.com
+            </a>
+            <a
+              href="https://Facebook.com/GetJBoards"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-brand-600 hover:underline"
+            >
+              📘 Facebook Page
+            </a>
+            <a
               href="https://github.com/pixelpropshop/JSenseFirmware"
               target="_blank"
               rel="noopener noreferrer"
@@ -371,6 +420,54 @@ export default function About() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      {confirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full p-6 border border-gray-200 dark:border-gray-800">
+            <h3 className={`text-lg font-semibold mb-3 ${confirmDialog.dangerous ? 'text-red-600' : ''}`}>
+              {confirmDialog.title}
+            </h3>
+            <p className="text-gray-700 dark:text-gray-300 mb-6">
+              {confirmDialog.message}
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setConfirmDialog(null);
+                  setPendingFile(null);
+                }}
+                className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (confirmDialog.secondConfirm) {
+                    // Show second confirmation
+                    setConfirmDialog({
+                      title: confirmDialog.title,
+                      message: confirmDialog.secondConfirm,
+                      dangerous: true,
+                      onConfirm: confirmDialog.onConfirm,
+                    });
+                  } else {
+                    confirmDialog.onConfirm();
+                    setConfirmDialog(null);
+                  }
+                }}
+                className={`px-4 py-2 rounded-lg text-white transition-colors ${
+                  confirmDialog.dangerous
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-brand-600 hover:bg-brand-700'
+                }`}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
