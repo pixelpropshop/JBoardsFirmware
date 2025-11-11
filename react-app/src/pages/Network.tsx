@@ -56,8 +56,6 @@ export default function Network() {
   const [showWiFiConfirm, setShowWiFiConfirm] = useState(false);
   const [showAPConfirm, setShowAPConfirm] = useState(false);
   const [showAPAdvanced, setShowAPAdvanced] = useState(false);
-  const [showHostnameSection, setShowHostnameSection] = useState(false);
-  const [showProfilesSection, setShowProfilesSection] = useState(false);
   const [availableNetworks, setAvailableNetworks] = useState<ScanResult[]>([]);
   const [showNetworkList, setShowNetworkList] = useState(false);
   const [resettingPortal, setResettingPortal] = useState(false);

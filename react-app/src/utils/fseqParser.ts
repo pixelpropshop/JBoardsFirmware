@@ -55,7 +55,8 @@ export async function parseFseqFile(file: File): Promise<FseqMetadata> {
   }
 
   // Read header offset (offset 4-5, little-endian)
-  const headerOffset = dataView.getUint16(4, true);
+  // Header offset (not currently used)
+  // const headerOffset = dataView.getUint16(4, true);
 
   // Read version (offset 6-7)
   const minorVersion = dataView.getUint8(6);
@@ -68,7 +69,8 @@ export async function parseFseqFile(file: File): Promise<FseqMetadata> {
   }
 
   // Read channel data offset (offset 8-11, little-endian)
-  const channelDataOffset = dataView.getUint32(8, true);
+  // Channel data offset (not currently used)
+  // const channelDataOffset = dataView.getUint32(8, true);
 
   // Read channel count (offset 12-15, little-endian)
   const channelCount = dataView.getUint32(12, true);

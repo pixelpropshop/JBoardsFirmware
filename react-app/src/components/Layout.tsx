@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import SequencePlaybackWidget from './SequencePlaybackWidget'
+import { ToastContainer } from './Toast'
 
 export default function Layout() {
   return (
@@ -12,6 +13,7 @@ export default function Layout() {
         <Outlet />
       </main>
       <SequencePlaybackWidget />
+      <ToastContainer />
     </div>
   )
 }

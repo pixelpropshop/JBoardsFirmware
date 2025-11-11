@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { effectsService } from '../services/effectsService';
 import type { Effect, LEDState, EffectParameter, EffectPreset } from '../types/effects';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function Effects() {
   const [effects, setEffects] = useState<Effect[]>([]);
@@ -15,6 +16,7 @@ export default function Effects() {
   const [presetName, setPresetName] = useState('');
   const [savingPreset, setSavingPreset] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -140,9 +142,11 @@ export default function Effects() {
     }
   };
 
-  const handleDeletePreset = async (presetId: string) => {
-    if (!confirm('Delete this preset?')) return;
+  const handleDeletePreset = (presetId: string) => {
+    setConfirmDelete(presetId);
+  };
 
+  const performDeletePreset = async (presetId: string) => {
     try {
       const result = await effectsService.deletePreset(presetId);
       if (result.success) {
@@ -785,6 +789,20 @@ export default function Effects() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete Preset"
+          message="Delete this preset?"
+          onConfirm={() => {
+            performDeletePreset(confirmDelete);
+            setConfirmDelete(null);
+          }}
+          onCancel={() => setConfirmDelete(null)}
+          dangerous={true}
+        />
       )}
     </div>
   );

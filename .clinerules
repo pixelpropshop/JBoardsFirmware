@@ -44,6 +44,12 @@
 - Types: /src/types/
 - Utils: /src/utils/
 
+## API Documentation
+- Don't read API docs unless implementing backend endpoints
+- docs/api/ split by category - only read relevant file
+- Service files have TypeScript contracts needed for frontend
+- Only update API docs when adding new endpoints
+
 ## Before Completing Tasks
 - Verify TypeScript compiles
 - Check all imports resolved

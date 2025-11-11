@@ -3738,6 +3738,1666 @@ Frontend uses semantic versioning (x.y.z) for comparison:
 
 ---
 
+## Hardware Configuration API Endpoints
+
+The Hardware Configuration API provides endpoints for managing optional hardware components like RTC (Real-Time Clock) and OLED displays.
+
+### 74. Get RTC Status
+
+**Endpoint:** `GET /api/hardware/rtc/status`
+
+**Description:** Retrieve current RTC hardware status and time information.
+
+**Response:**
+```json
+{
+  "available": true,
+  "currentTime": "2025-01-10T15:30:00Z",
+  "isTimeSynced": true,
+  "ntpEnabled": true
+}
+```
+
+**Notes:**
+- available: Whether RTC hardware is present and functional
+- currentTime: ISO timestamp from RTC module
+- isTimeSynced: Whether time has been synced recently
+- ntpEnabled: Whether NTP sync is enabled
+- Used by Settings page to show RTC status
+
+---
+
+### 75. Get RTC Configuration
+
+**Endpoint:** `GET /api/hardware/rtc`
+
+**Description:** Retrieve RTC configuration settings.
+
+**Response:**
+```json
+{
+  "enabled": true,
+  "timezone": "America/Phoenix",
+  "timeFormat": "12h",
+  "dateFormat": "MM/DD/YYYY",
+  "syncPriority": "ntp",
+  "lastSync": "2025-01-10T15:00:00Z"
+}
+```
+
+**Notes:**
+- timeFormat: '12h' or '24h'
+- dateFormat: 'MM/DD/YYYY', 'DD/MM/YYYY', or 'YYYY-MM-DD'
+- syncPriority: 'ntp', 'rtc', or 'manual'
+- lastSync: ISO timestamp of last successful time sync
+
+---
+
+### 76. Update RTC Configuration
+
+**Endpoint:** `POST /api/hardware/rtc`
+
+**Description:** Update RTC configuration settings.
+
+**Request Body:**
+```json
+{
+  "enabled": true,
+  "timezone": "America/Phoenix",
+  "timeFormat": "24h",
+  "dateFormat": "YYYY-MM-DD",
+  "syncPriority": "ntp"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "RTC configuration updated successfully"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Invalid timezone or RTC not available"
+}
+```
+
+**Notes:**
+- Partial updates supported (only send fields to change)
+- Timezone must be valid IANA timezone identifier
+- Changes take effect immediately
+- Time sync triggered if syncPriority changed
+
+---
+
+### 77. Sync RTC Time
+
+**Endpoint:** `POST /api/hardware/rtc/sync`
+
+**Description:** Manually trigger time synchronization based on current sync priority.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Time synchronized successfully",
+  "currentTime": "2025-01-10T15:30:00Z"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "NTP sync failed or RTC not available"
+}
+```
+
+**Notes:**
+- Syncs time based on syncPriority setting (NTP or RTC)
+- Returns updated current time after sync
+- May take several seconds for NTP sync
+- Updates lastSync timestamp
+
+---
+
+### 78. Set Manual Time
+
+**Endpoint:** `POST /api/hardware/rtc/set-time`
+
+**Description:** Manually set RTC time (when syncPriority is 'manual').
+
+**Request Body:**
+```json
+{
+  "time": "2025-01-10T15:30:00Z"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Time set successfully"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Invalid time format or RTC not available"
+}
+```
+
+**Notes:**
+- time: ISO 8601 timestamp string
+- Only works when syncPriority is 'manual'
+- Updates RTC module immediately
+- Updates lastSync timestamp
+
+---
+
+### 79. Get OLED Status
+
+**Endpoint:** `GET /api/hardware/oled/status`
+
+**Description:** Retrieve current OLED display status.
+
+**Response:**
+```json
+{
+  "available": true,
+  "width": 128,
+  "height": 64,
+  "currentScreen": "clock",
+  "isActive": true
+}
+```
+
+**Notes:**
+- available: Whether OLED hardware is present and functional
+- width/height: Display resolution in pixels
+- currentScreen: Currently displayed screen type
+- isActive: Whether display is currently on (not timed out)
+- Used by Settings page to show OLED status
+
+---
+
+### 80. Get OLED Configuration
+
+**Endpoint:** `GET /api/hardware/oled`
+
+**Description:** Retrieve OLED display configuration settings.
+
+**Response:**
+```json
+{
+  "enabled": true,
+  "brightness": 80,
+  "timeout": "5m",
+  "autoSleep": true,
+  "rotation": 0,
+  "defaultScreen": "rotating",
+  "screenSaver": false
+}
+```
+
+**Notes:**
+- brightness: 0-255 (hardware brightness level)
+- timeout: 'always-on', '30s', '1m', '5m', or '10m'
+- rotation: 0, 90, 180, or 270 degrees
+- defaultScreen: 'clock', 'ip-address', 'status', 'sequence', or 'rotating'
+- screenSaver: Enable/disable screen saver mode
+
+---
+
+### 81. Update OLED Configuration
+
+**Endpoint:** `POST /api/hardware/oled`
+
+**Description:** Update OLED display configuration settings.
+
+**Request Body:**
+```json
+{
+  "enabled": true,
+  "brightness": 120,
+  "timeout": "1m",
+  "autoSleep": true,
+  "rotation": 180,
+  "defaultScreen": "clock",
+  "screenSaver": true
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "OLED configuration updated successfully"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Invalid configuration or OLED not available"
+}
+```
+
+**Notes:**
+- Partial updates supported (only send fields to change)
+- brightness: 0-255 range validation required
+- timeout: Must be one of the valid timeout values
+- rotation: Must be 0, 90, 180, or 270
+- Changes apply immediately to display
+
+---
+
+### 82. Test OLED Display
+
+**Endpoint:** `POST /api/hardware/oled/test`
+
+**Description:** Display test pattern on OLED for verification.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Test pattern displayed on OLED"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "OLED not available"
+}
+```
+
+**Notes:**
+- Displays test pattern (checkerboard, text, or gradient)
+- Used to verify display is working correctly
+- Test pattern shows for 5 seconds then returns to normal display
+- Does not change any configuration settings
+
+---
+
+## Hardware Configuration Implementation Notes
+
+### RTC Module Support
+
+**Hardware Requirements:**
+- DS3231 or DS1307 RTC module (I2C interface)
+- Coin cell battery for time keeping during power loss
+- Connected to ESP32 I2C pins (default: SDA=21, SCL=22)
+
+**ESP32 Implementation:**
+```cpp
+#include <RTClib.h>
+
+RTC_DS3231 rtc;
+
+// Initialize RTC
+void setupRTC() {
+  if (!rtc.begin()) {
+    Serial.println("RTC not found");
+    return;
+  }
+  
+  if (rtc.lostPower()) {
+    Serial.println("RTC lost power, setting time");
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  }
+}
+
+// Get RTC time
+String getRTCTime() {
+  DateTime now = rtc.now();
+  char timestamp[32];
+  sprintf(timestamp, "%04d-%02d-%02dT%02d:%02d:%02d",
+    now.year(), now.month(), now.day(),
+    now.hour(), now.minute(), now.second());
+  return String(timestamp);
+}
+```
+
+**Time Synchronization:**
+1. **NTP Priority:**
+   - Fetch time from NTP server (e.g., pool.ntp.org)
+   - Update RTC with NTP time
+   - Fallback to RTC if NTP fails
+   
+2. **RTC Priority:**
+   - Use RTC as primary time source
+   - Optional NTP verification
+   - Update RTC from NTP periodically
+   
+3. **Manual Priority:**
+   - User sets time via frontend
+   - No automatic synchronization
+   - Useful for offline operation
+
+### OLED Display Support
+
+**Hardware Requirements:**
+- SSD1306 OLED display (I2C or SPI interface)
+- Common sizes: 128x64, 128x32
+- Connected to ESP32 I2C pins (default: SDA=21, SCL=22)
+
+**ESP32 Implementation:**
+```cpp
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// Initialize OLED
+void setupOLED() {
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("OLED not found");
+    return;
+  }
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+}
+
+// Update display content
+void updateOLED(String screen) {
+  display.clearDisplay();
+  
+  if (screen == "clock") {
+    displayClock();
+  } else if (screen == "ip-address") {
+    displayIPAddress();
+  } else if (screen == "status") {
+    displaySystemStatus();
+  }
+  
+  display.display();
+}
+```
+
+**Display Modes:**
+- **clock**: Digital clock display with date/time
+- **ip-address**: Current WiFi IP address
+- **status**: System status (uptime, memory, temperature)
+- **sequence**: Currently playing sequence info
+- **rotating**: Cycles through all modes every 10 seconds
+
+**Screen Timeout:**
+- Turns off display after inactivity period
+- Saves power and prevents OLED burn-in
+- Display wakes on button press or activity
+- 'always-on' disables timeout
+
+**Brightness Control:**
+- Uses hardware brightness (not contrast)
+- Value range: 0-255
+- Lower values extend OLED lifespan
+- Recommended: 80-120 for indoor use
+
+### Frontend Integration
+
+**Settings Page Sections:**
+- RTC Configuration card (if available)
+- OLED Configuration card (if available)
+- Real-time status updates
+- Hardware detection on page load
+
+**Hardware Detection:**
+```typescript
+// Check hardware availability
+const rtcStatus = await hardwareService.getRTCStatus();
+if (rtcStatus.available) {
+  // Show RTC configuration
+}
+
+const oledStatus = await hardwareService.getOLEDStatus();
+if (oledStatus.available) {
+  // Show OLED configuration
+}
+```
+
+### Security Considerations
+
+1. **Time Synchronization:**
+   - Validate NTP server responses
+   - Prevent time injection attacks
+   - Limit manual time adjustment frequency
+   
+2. **Display Content:**
+   - Sanitize text before display
+   - Prevent buffer overflow in display code
+   - Limit custom message length
+
+3. **Configuration Validation:**
+   - Validate all user inputs
+   - Enforce reasonable limits (brightness, timeout)
+   - Prevent invalid configuration states
+
+---
+
+## Sensors API Endpoints
+
+The Sensors API provides endpoints for monitoring environmental sensors, configuring thresholds, managing alerts, and setting up automation rules.
+
+### 83. Get All Sensors
+
+**Endpoint:** `GET /api/sensors`
+
+**Description:** Retrieve list of all configured sensors with current readings.
+
+**Response:**
+```json
+[
+  {
+    "id": "temp-1",
+    "name": "Temperature",
+    "type": "temperature",
+    "currentReading": {
+      "value": 22.5,
+      "unit": "°C",
+      "timestamp": 1704902400000,
+      "status": "active"
+    },
+    "config": {
+      "enabled": true,
+      "samplingRate": 1000,
+      "smoothing": 3,
+      "threshold": {
+        "min": 15,
+        "max": 30,
+        "warningMin": 18,
+        "warningMax": 28
+      },
+      "calibrationOffset": 0,
+      "triggerEffect": "rainbow"
+    },
+    "pin": 34,
+    "lastCalibrated": 1704816000000
+  }
+]
+```
+
+**Notes:**
+- type: temperature, humidity, pressure, light, sound, motion, proximity, air_quality, voltage, current, custom
+- status: active, idle, error, disabled, calibrating
+- samplingRate: Milliseconds between readings
+- smoothing: Number of samples to average (1-10)
+
+---
+
+### 84. Get Sensor by ID
+
+**Endpoint:** `GET /api/sensors/{id}`
+
+**Description:** Retrieve detailed information for a specific sensor.
+
+**Response:**
+```json
+{
+  "id": "temp-1",
+  "name": "Temperature",
+  "type": "temperature",
+  "currentReading": {
+    "value": 22.5,
+    "unit": "°C",
+    "timestamp": 1704902400000,
+    "status": "active"
+  },
+  "config": {
+    "enabled": true,
+    "samplingRate": 1000,
+    "smoothing": 3,
+    "threshold": {
+      "min": 15,
+      "max": 30,
+      "warningMin": 18,
+      "warningMax": 28
+    },
+    "calibrationOffset": 0
+  },
+  "pin": 34,
+  "lastCalibrated": 1704816000000
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Sensor not found"
+}
+```
+
+---
+
+### 85. Update Sensor Configuration
+
+**Endpoint:** `PUT /api/sensors/{id}/config`
+
+**Description:** Update sensor configuration settings.
+
+**Request Body:**
+```json
+{
+  "enabled": true,
+  "samplingRate": 2000,
+  "smoothing": 5,
+  "threshold": {
+    "min": 10,
+    "max": 35,
+    "warningMin": 15,
+    "warningMax": 30
+  },
+  "calibrationOffset": -0.5,
+  "triggerEffect": "rainbow"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Sensor configuration updated successfully"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Invalid configuration or sensor not found"
+}
+```
+
+**Notes:**
+- Partial updates supported (only send fields to change)
+- samplingRate: 100-10000ms range
+- smoothing: 1-10 samples
+- threshold values validated based on sensor type
+- Changes apply immediately
+
+---
+
+### 86. Calibrate Sensor
+
+**Endpoint:** `POST /api/sensors/{id}/calibrate`
+
+**Description:** Calibrate sensor using a known reference value.
+
+**Request Body:**
+```json
+{
+  "referenceValue": 25.0
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Sensor calibrated successfully",
+  "calibration": {
+    "sensorId": "temp-1",
+    "referenceValue": 25.0,
+    "measuredValue": 24.5,
+    "offset": 0.5,
+    "timestamp": 1704902400000
+  }
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Sensor not found or calibration failed"
+}
+```
+
+**Notes:**
+- referenceValue: Known accurate measurement
+- measuredValue: Current sensor reading
+- offset: Calculated correction factor (referenceValue - measuredValue)
+- Offset automatically applied to future readings
+- Updates lastCalibrated timestamp
+
+---
+
+### 87. Get Sensor History
+
+**Endpoint:** `GET /api/sensors/{id}/history`
+
+**Description:** Retrieve historical sensor data for charting.
+
+**Query Parameters:**
+- start: Start timestamp (milliseconds since epoch)
+- end: End timestamp (milliseconds since epoch)
+
+**Response:**
+```json
+{
+  "sensorId": "temp-1",
+  "data": [
+    {
+      "timestamp": 1704902340000,
+      "value": 22.3
+    },
+    {
+      "timestamp": 1704902400000,
+      "value": 22.5
+    },
+    {
+      "timestamp": 1704902460000,
+      "value": 22.7
+    }
+  ],
+  "startTime": 1704902340000,
+  "endTime": 1704906000000
+}
+```
+
+**Notes:**
+- Returns time-series data for specified range
+- Maximum range: 24 hours
+- Data points at sampling rate intervals
+- Used for historical charts
+
+---
+
+### 88. Get Sensor Statistics
+
+**Endpoint:** `GET /api/sensors/{id}/stats`
+
+**Description:** Retrieve statistical summary for sensor over specified duration.
+
+**Query Parameters:**
+- duration: Duration in milliseconds (default: 3600000 = 1 hour)
+
+**Response:**
+```json
+{
+  "min": 20.5,
+  "max": 25.3,
+  "avg": 22.8,
+  "current": 22.5
+}
+```
+
+**Notes:**
+- Calculated over specified duration from current time
+- All values in sensor's native units
+- Used for summary displays
+
+---
+
+### 89. Get Sensor Alerts
+
+**Endpoint:** `GET /api/sensors/alerts`
+
+**Description:** Retrieve active sensor alerts.
+
+**Query Parameters:**
+- acknowledged: Filter by acknowledged status (default: false)
+
+**Response:**
+```json
+[
+  {
+    "id": "alert-1",
+    "sensorId": "temp-1",
+    "sensorName": "Temperature",
+    "severity": "warning",
+    "message": "Temperature above warning threshold (29°C > 28°C)",
+    "timestamp": 1704902400000,
+    "acknowledged": false
+  }
+]
+```
+
+**Notes:**
+- severity: info, warning, critical
+- Sorted by timestamp (newest first)
+- Only unacknowledged alerts shown by default
+
+---
+
+### 90. Acknowledge Alert
+
+**Endpoint:** `POST /api/sensors/alerts/{id}/acknowledge`
+
+**Description:** Mark an alert as acknowledged/dismissed.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Alert acknowledged successfully"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Alert not found"
+}
+```
+
+**Notes:**
+- Acknowledged alerts hidden from default alert list
+- Alert remains in history/logs
+
+---
+
+### 91. Clear All Alerts
+
+**Endpoint:** `DELETE /api/sensors/alerts`
+
+**Description:** Clear all sensor alerts.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "All alerts cleared successfully"
+}
+```
+
+**Notes:**
+- Clears both acknowledged and unacknowledged alerts
+- Does not delete from permanent logs
+- Cannot be undone
+
+---
+
+### 92. Get Automation Rules
+
+**Endpoint:** `GET /api/sensors/automation/rules`
+
+**Description:** Retrieve all sensor automation rules.
+
+**Response:**
+```json
+[
+  {
+    "id": "rule-1",
+    "name": "High Temperature Alert",
+    "sensorId": "temp-1",
+    "condition": "above",
+    "value1": 28,
+    "action": "send_alert",
+    "actionData": "Temperature too high!",
+    "enabled": true
+  },
+  {
+    "id": "rule-2",
+    "name": "Low Light Effect",
+    "sensorId": "light-1",
+    "condition": "below",
+    "value1": 200,
+    "action": "trigger_effect",
+    "actionData": "rainbow",
+    "enabled": true
+  }
+]
+```
+
+**Notes:**
+- condition: above, below, between, outside
+- action: trigger_effect, send_alert, trigger_scene
+- value2: Required for 'between' and 'outside' conditions
+
+---
+
+### 93. Create Automation Rule
+
+**Endpoint:** `POST /api/sensors/automation/rules`
+
+**Description:** Create new sensor automation rule.
+
+**Request Body:**
+```json
+{
+  "name": "Motion Trigger",
+  "sensorId": "motion-1",
+  "condition": "above",
+  "value1": 50,
+  "action": "trigger_effect",
+  "actionData": "strobe",
+  "enabled": true
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Automation rule created successfully",
+  "rule": {
+    "id": "rule-3",
+    "name": "Motion Trigger",
+    "sensorId": "motion-1",
+    "condition": "above",
+    "value1": 50,
+    "action": "trigger_effect",
+    "actionData": "strobe",
+    "enabled": true
+  }
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Invalid sensor ID or action data"
+}
+```
+
+**Notes:**
+- name: 1-64 characters, unique
+- Validates sensorId exists
+- Validates actionData based on action type
+- Rules evaluated on each sensor reading
+
+---
+
+### 94. Update Automation Rule
+
+**Endpoint:** `PUT /api/sensors/automation/rules/{id}`
+
+**Description:** Update existing automation rule.
+
+**Request Body:**
+```json
+{
+  "name": "Updated Rule Name",
+  "enabled": false,
+  "value1": 30
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Automation rule updated successfully"
+}
+```
+
+**Notes:**
+- Partial updates supported
+- Cannot change rule ID
+- Validates all changed fields
+
+---
+
+### 95. Delete Automation Rule
+
+**Endpoint:** `DELETE /api/sensors/automation/rules/{id}`
+
+**Description:** Delete an automation rule.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Automation rule deleted successfully"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Rule not found"
+}
+```
+
+---
+
+### 96. Get Sensor Groups
+
+**Endpoint:** `GET /api/sensors/groups`
+
+**Description:** Retrieve sensor groupings for organization.
+
+**Response:**
+```json
+[
+  {
+    "id": "group-1",
+    "name": "Environmental",
+    "sensorIds": ["temp-1", "humid-1"],
+    "icon": "🌡️"
+  }
+]
+```
+
+**Notes:**
+- Used for organizing sensors in UI
+- Groups can contain any sensor types
+- Icon: Emoji or icon identifier
+
+---
+
+### 97. Create Sensor Group
+
+**Endpoint:** `POST /api/sensors/groups`
+
+**Description:** Create new sensor group.
+
+**Request Body:**
+```json
+{
+  "name": "Ambient Monitoring",
+  "sensorIds": ["light-1", "sound-1"],
+  "icon": "💡"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Sensor group created successfully",
+  "group": {
+    "id": "group-3",
+    "name": "Ambient Monitoring",
+    "sensorIds": ["light-1", "sound-1"],
+    "icon": "💡"
+  }
+}
+```
+
+---
+
+### 98. Export Sensor Data
+
+**Endpoint:** `GET /api/sensors/export`
+
+**Description:** Export all sensor data to CSV file.
+
+**Query Parameters:**
+- format: Export format ('csv' or 'json', default: 'csv')
+
+**Response:** Binary file download (CSV or JSON)
+
+**Headers:**
+```
+Content-Type: text/csv | application/json
+Content-Disposition: attachment; filename="sensor-data-<timestamp>.csv"
+Content-Length: <file size>
+```
+
+**CSV Format:**
+```csv
+Sensor,Value,Unit,Timestamp
+Temperature,22.5,°C,2025-01-10T15:30:00Z
+Humidity,45,%,2025-01-10T15:30:00Z
+Light Level,350,lux,2025-01-10T15:30:00Z
+Sound Level,65,dB,2025-01-10T15:30:00Z
+```
+
+**JSON Format:**
+```json
+{
+  "sensors": [...],
+  "history": [...],
+  "alerts": [...],
+  "automationRules": [...],
+  "exportTimestamp": 1704902400000
+}
+```
+
+**Notes:**
+- CSV: Current sensor readings only
+- JSON: Complete data including history and config
+- Filename includes timestamp for organization
+
+---
+
+## Sensors Implementation Notes
+
+### Sensor Types
+
+| Type | Unit | Range | Description |
+|------|------|-------|-------------|
+| temperature | °C | -40 to 125 | Temperature sensor (DHT22, DS18B20, etc.) |
+| humidity | % | 0 to 100 | Relative humidity sensor |
+| pressure | hPa | 300 to 1100 | Barometric pressure sensor |
+| light | lux | 0 to 10000 | Light intensity sensor |
+| sound | dB | 0 to 120 | Sound level sensor |
+| motion | % | 0 to 100 | Motion detection (PIR sensor) |
+| proximity | cm | 0 to 400 | Distance sensor (ultrasonic, IR) |
+| air_quality | AQI | 0 to 500 | Air quality index sensor |
+| voltage | V | 0 to 50 | Voltage measurement |
+| current | A | 0 to 50 | Current measurement |
+| custom | varies | varies | User-defined sensor type |
+
+### Threshold System
+
+**Four-Level System:**
+1. **Normal Range:** Between min and max thresholds (green indicator)
+2. **Warning Range:** Between warningMin/warningMax and min/max (yellow indicator)
+3. **Critical Range:** Below min or above max (red indicator, pulsing)
+4. **Disabled:** No thresholds configured
+
+**Threshold Triggers:**
+- Automation rules evaluated on threshold breach
+- Alerts generated for warning and critical conditions
+- LED effects can be triggered automatically
+- Notification system integration (future)
+
+### Sampling & Smoothing
+
+**Sampling Rate:**
+- Minimum: 100ms (10 readings/second)
+- Maximum: 10000ms (1 reading/10 seconds)
+- Affects responsiveness vs. noise
+- Lower rate for stable sensors (temperature)
+- Higher rate for dynamic sensors (sound, motion)
+
+**Smoothing Algorithm:**
+- Simple moving average over N samples
+- Range: 1-10 samples
+- Reduces noise and false triggers
+- Higher smoothing = more stable, less responsive
+- Lower smoothing = more responsive, noisier
+
+### ESP32 Implementation Example
+
+```cpp
+#include <DHT.h>
+
+#define DHT_PIN 34
+#define DHT_TYPE DHT22
+
+DHT dht(DHT_PIN, DHT_TYPE);
+
+struct Sensor {
+  String id;
+  String name;
+  String type;
+  float currentValue;
+  bool enabled;
+  int samplingRate;
+  int smoothing;
+  float calibrationOffset;
+  unsigned long lastRead;
+  float samples[10];
+  int sampleIndex;
+};
+
+Sensor tempSensor = {
+  .id = "temp-1",
+  .name = "Temperature",
+  .type = "temperature",
+  .enabled = true,
+  .samplingRate = 1000,
+  .smoothing = 3,
+  .calibrationOffset = 0
+};
+
+void updateSensor(Sensor &sensor) {
+  if (!sensor.enabled) return;
+  
+  unsigned long now = millis();
+  if (now - sensor.lastRead < sensor.samplingRate) return;
+  
+  // Read sensor
+  float rawValue = dht.readTemperature();
+  if (isnan(rawValue)) return;
+  
+  // Apply calibration
+  rawValue += sensor.calibrationOffset;
+  
+  // Store in circular buffer
+  sensor.samples[sensor.sampleIndex] = rawValue;
+  sensor.sampleIndex = (sensor.sampleIndex + 1) % sensor.smoothing;
+  
+  // Calculate smoothed value
+  float sum = 0;
+  for (int i = 0; i < sensor.smoothing; i++) {
+    sum += sensor.samples[i];
+  }
+  sensor.currentValue = sum / sensor.smoothing;
+  
+  sensor.lastRead = now;
+  
+  // Check thresholds and trigger actions
+  checkThresholds(sensor);
+}
+
+void checkThresholds(Sensor &sensor) {
+  // Implement threshold checking and automation
+  // Trigger alerts, effects, etc.
+}
+```
+
+### Real-Time Updates
+
+**Frontend Auto-Refresh:**
+- Poll `/api/sensors` every 2 seconds
+- Updates all sensor readings simultaneously
+- Efficient single API call
+- Consider WebSocket for true real-time (future)
+
+**Backend Optimization:**
+- Cache sensor readings in memory
+- Only query hardware when reading changes
+- Batch database writes for history
+- Limit history storage (e.g., 7 days)
+
+### Data Logging
+
+**Storage Strategy:**
+- Store readings in circular buffer (RAM)
+- Write to SD card every 5 minutes
+- Downsample old data (hourly → daily averages)
+- Automatically purge data older than retention period
+
+**File Format (CSV):**
+```
+timestamp,sensor_id,value,status
+1704902400000,temp-1,22.5,active
+1704902460000,temp-1,22.7,active
+```
+
+### Security Considerations
+
+1. **Sensor Access:**
+   - Validate sensor IDs in all requests
+   - Prevent unauthorized sensor access
+   - Rate limit calibration requests
+
+2. **Automation Rules:**
+   - Validate action targets exist (effects, scenes)
+   - Limit number of rules per sensor
+   - Prevent infinite loops (rule triggering rule)
+
+3. **Data Export:**
+   - Limit export frequency
+   - File size limitations
+   - No sensitive information in exports
+
+---
+
+## Pixel Outputs API Endpoints
+
+The Pixel Outputs API provides endpoints for configuring and testing addressable LED pixel outputs. This system supports multiple pixel types (WS2811, WS2812B, SK6812, etc.) with power management and testing capabilities.
+
+### 99. Get Board Information
+
+**Endpoint:** `GET /api/pixels/board`
+
+**Description:** Retrieve board variant and pixel output capabilities.
+
+**Response:**
+```json
+{
+  "variant": "JBOARD-8",
+  "outputCount": 8,
+  "maxPixelsPerOutput": 2048,
+  "firmwareVersion": "1.0.0",
+  "availableGPIOs": [16, 17, 18, 19, 21, 22, 23, 25]
+}
+```
+
+**Notes:**
+- variant: Board model (JBOARD-2, JBOARD-4, JBOARD-8, JBOARD-16)
+- outputCount: Number of available pixel outputs
+- maxPixelsPerOutput: Maximum pixels supported per output
+- availableGPIOs: List of GPIO pins available for pixel outputs
+- Used by Pixels page to configure outputs appropriately
+
+---
+
+### 100. Get Pixel Configuration
+
+**Endpoint:** `GET /api/pixels/config`
+
+**Description:** Retrieve complete pixel output configuration.
+
+**Response:**
+```json
+{
+  "outputs": [
+    {
+      "id": "output-1",
+      "number": 1,
+      "name": "Main Strip",
+      "enabled": true,
+      "gpio": 16,
+      "pixelCount": 300,
+      "pixelType": "WS2812B",
+      "colorOrder": "GRB",
+      "voltage": 5,
+      "maxCurrent": 3000,
+      "status": "active"
+    },
+    {
+      "id": "output-2",
+      "number": 2,
+      "name": "Accent Strip",
+      "enabled": false,
+      "gpio": 17,
+      "pixelCount": 150,
+      "pixelType": "WS2811",
+      "colorOrder": "RGB",
+      "voltage": 12,
+      "maxCurrent": 2000,
+      "status": "idle"
+    }
+  ],
+  "estimatedCurrent": 5000,
+  "estimatedPower": 25.0,
+  "powerLimit": 200,
+  "supplyVoltage": 5
+}
+```
+
+**Notes:**
+- pixelType: WS2811, WS2812B, SK6812, SK6812_RGBW, APA102, WS2801
+- colorOrder: RGB, GRB, BRG, RBG, GBR, BGR, RGBW, GRBW
+- voltage: 5V or 12V supply voltage
+- maxCurrent: Maximum current in mA for this output
+- status: 'active', 'idle', 'error', 'testing'
+- estimatedCurrent: Total estimated current draw in mA
+- estimatedPower: Total estimated power consumption in watts
+- powerLimit: Maximum allowed power consumption in watts
+
+---
+
+### 101. Update Pixel Output
+
+**Endpoint:** `PUT /api/pixels/output/{id}`
+
+**Description:** Update configuration for a specific pixel output.
+
+**Request Body:**
+```json
+{
+  "name": "Updated Strip Name",
+  "enabled": true,
+  "gpio": 16,
+  "pixelCount": 300,
+  "pixelType": "WS2812B",
+  "colorOrder": "GRB",
+  "voltage": 5,
+  "maxCurrent": 3000
+}
+```
+
+**Response:**
+```json
+{
+  "id": "output-1",
+  "number": 1,
+  "name": "Updated Strip Name",
+  "enabled": true,
+  "gpio": 16,
+  "pixelCount": 300,
+  "pixelType": "WS2812B",
+  "colorOrder": "GRB",
+  "voltage": 5,
+  "maxCurrent": 3000,
+  "status": "active"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Pixel count exceeds maximum for this board"
+}
+```
+
+**Notes:**
+- Partial updates supported (only send fields to change)
+- Validates pixelCount against board maximum
+- Validates GPIO pin is available
+- Recalculates power estimates after update
+- Changes apply immediately
+
+---
+
+### 102. Test Pixel Output
+
+**Endpoint:** `POST /api/pixels/output/{id}/test`
+
+**Description:** Test a specific pixel output with an effect.
+
+**Request Body:**
+```json
+{
+  "effectId": "rainbow",
+  "parameters": {
+    "speed": 50,
+    "mode": "gradient",
+    "saturation": 100
+  },
+  "brightness": 128,
+  "duration": 0
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Test started on output 1",
+  "outputId": "output-1"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Output is disabled or effect not found"
+}
+```
+
+**Notes:**
+- Uses Effects system for test patterns
+- effectId: ID of effect from Effects library
+- parameters: Effect-specific parameters
+- brightness: 0-255 brightness level
+- duration: Test duration in seconds (0 = continuous)
+- Test runs until stopped or duration expires
+- Only one test can run per output at a time
+
+---
+
+### 103. Stop Output Test
+
+**Endpoint:** `POST /api/pixels/output/{id}/stop`
+
+**Description:** Stop testing on a specific pixel output.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Test stopped on output 1"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "No test running on this output"
+}
+```
+
+**Notes:**
+- Turns off pixels on specified output
+- Returns output to idle state
+- Safe to call even if no test is running
+
+---
+
+### 104. Test All Outputs
+
+**Endpoint:** `POST /api/pixels/test/all`
+
+**Description:** Test all enabled pixel outputs simultaneously.
+
+**Request Body:**
+```json
+{
+  "effectId": "solid",
+  "parameters": {
+    "color": "#ff0000"
+  },
+  "brightness": 128,
+  "duration": 0
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Test started on 3 enabled outputs",
+  "outputCount": 3
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "No outputs are enabled"
+}
+```
+
+**Notes:**
+- Only tests enabled outputs
+- All outputs use same effect and parameters
+- Useful for verifying all outputs work
+- Individual output tests are stopped before starting all test
+
+---
+
+### 105. Turn All Outputs Off
+
+**Endpoint:** `POST /api/pixels/off`
+
+**Description:** Turn off all pixel outputs immediately.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "All outputs turned off"
+}
+```
+
+**Notes:**
+- Stops all tests and turns off all pixels
+- Emergency stop function
+- Safe to call at any time
+- Does not change output enabled state
+
+---
+
+## Pixel Outputs Implementation Notes
+
+### Power Management
+
+**Current Estimation:**
+- Based on pixel type, count, and brightness
+- Assumes 60mA per pixel at full white (RGB)
+- Assumes 80mA per pixel at full white (RGBW)
+- Actual current varies with color and brightness
+- Frontend shows warnings when limits approached
+
+**Power Limits:**
+- Critical: >100% of power limit (red, pulsing)
+- Warning: 80-100% of power limit (yellow)
+- Normal: <80% of power limit (green)
+- Per-output limits checked independently
+- Total system power calculated across all outputs
+
+**Voltage Considerations:**
+- 5V pixels: Standard WS2812B, SK6812
+- 12V pixels: WS2811 (typically 3 LEDs per IC)
+- Validate voltage matches pixel type
+- Calculate power as: (current in A) × voltage
+
+### Pixel Types and Specifications
+
+| Type | Voltage | Current/Pixel | Color Order | Data Rate | Notes |
+|------|---------|---------------|-------------|-----------|-------|
+| WS2812B | 5V | 60mA | GRB | 800kHz | Most common, integrated IC |
+| WS2811 | 12V | 60mA | RGB | 800kHz | External IC, 3 LEDs per IC |
+| SK6812 | 5V | 60mA | GRB | 800kHz | Similar to WS2812B |
+| SK6812_RGBW | 5V | 80mA | GRBW | 800kHz | Adds white LED |
+| APA102 | 5V | 60mA | BGR | 1MHz | Clock + data, higher refresh |
+| WS2801 | 5V | 60mA | RGB | 25MHz | Clock + data, older type |
+
+### Color Order Configuration
+
+Different pixel types use different color orders. The color order setting ensures correct color display:
+- **GRB**: Most WS2812B strips (green, red, blue)
+- **RGB**: Standard order (red, green, blue)
+- **GRBW**: RGBW pixels with white LED
+- **Other orders**: Less common but supported for compatibility
+
+### GPIO Pin Assignment
+
+**Recommendations:**
+- Use dedicated output pins (avoid boot/flash pins)
+- Avoid shared I2C/SPI pins unless necessary
+- ESP32 standard: GPIO 16-25 for LED outputs
+- Keep high-current outputs on different power rails
+- Consider pin capacitance for long strips
+
+### Testing Tools Integration
+
+**Effects System:**
+- Pixels page uses Effects library for test patterns
+- All 16 effects available for testing
+- Dynamic parameter controls
+- Same effect engine as Effects page
+- Consistent behavior across pages
+
+**Test Workflow:**
+1. User selects effect from dropdown
+2. Configures effect parameters
+3. Clicks "Test Output" or "Test All"
+4. Effect applied to selected outputs
+5. User clicks "Stop Test" or "Turn All Off" when done
+
+### ESP32 Implementation Example
+
+```cpp
+#include <FastLED.h>
+
+#define MAX_OUTPUTS 8
+#define MAX_LEDS_PER_OUTPUT 2048
+
+struct PixelOutput {
+  String id;
+  int number;
+  String name;
+  bool enabled;
+  int gpio;
+  int pixelCount;
+  String pixelType;
+  String colorOrder;
+  int voltage;
+  int maxCurrent;
+  String status;
+  CRGB* leds;
+};
+
+PixelOutput outputs[MAX_OUTPUTS];
+
+void setupPixelOutputs() {
+  // Load config from storage
+  loadPixelConfig();
+  
+  // Initialize FastLED for each enabled output
+  for (int i = 0; i < MAX_OUTPUTS; i++) {
+    if (outputs[i].enabled && outputs[i].pixelCount > 0) {
+      outputs[i].leds = new CRGB[outputs[i].pixelCount];
+      
+      // Configure FastLED based on pixel type and GPIO
+      if (outputs[i].pixelType == "WS2812B") {
+        FastLED.addLeds<WS2812B, DATA_PIN, GRB>(
+          outputs[i].leds, 
+          outputs[i].pixelCount
+        ).setCorrection(TypicalLEDStrip);
+      }
+      // ... other pixel types
+      
+      outputs[i].status = "idle";
+    }
+  }
+}
+
+void testOutput(int outputIndex, String effectId, JsonObject params) {
+  if (!outputs[outputIndex].enabled) return;
+  
+  // Apply effect to output
+  applyEffect(outputs[outputIndex].leds, 
+              outputs[outputIndex].pixelCount,
+              effectId, 
+              params);
+  
+  outputs[outputIndex].status = "testing";
+  FastLED.show();
+}
+
+void allOff() {
+  for (int i = 0; i < MAX_OUTPUTS; i++) {
+    if (outputs[i].enabled && outputs[i].leds != nullptr) {
+      fill_solid(outputs[i].leds, outputs[i].pixelCount, CRGB::Black);
+      outputs[i].status = "idle";
+    }
+  }
+  FastLED.show();
+}
+```
+
+### Frontend Integration
+
+**Configuration UI:**
+- Board info card shows variant and capabilities
+- Power usage visualization (gauge or progress bar)
+- Warning badges for power limit violations
+- Per-output configuration cards with inline editing
+- GPIO pin selection dropdown (available pins only)
+
+**Testing UI:**
+- Effect selector (dropdown with emojis)
+- Dynamic parameter controls based on selected effect
+- Brightness slider (0-255)
+- "Test Output" button on each output card
+- "Test All" and "Turn All Off" global buttons
+- Visual feedback when testing (button states, badges)
+
+### Security Considerations
+
+1. **Power Safety:**
+   - Enforce power limits to prevent damage
+   - Warn user before exceeding limits
+   - Provide emergency "All Off" button
+   - Log power violations
+
+2. **Configuration Validation:**
+   - Validate GPIO pins available on board
+   - Check pixel count within limits
+   - Verify pixel type/voltage combinations
+   - Prevent conflicting GPIO assignments
+
+3. **Testing Safety:**
+   - Limit test brightness to prevent overheating
+   - Auto-timeout for long tests (optional)
+   - Prevent concurrent tests on same output
+   - Clear error states before new test
+
+---
+
 ## Future Enhancements
 
 1. **WebSocket Support:**

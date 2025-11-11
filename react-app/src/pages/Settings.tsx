@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { systemService } from '../services/systemService';
 import { firmwareService } from '../services/firmwareService';
+import { hardwareService, TIMEZONES } from '../services/hardwareService';
 import type { SystemInfo, FirmwareUpdateProgress } from '../types/system';
 import type { UpdateCheckResult, OTAStatus } from '../types/firmware';
+import type { RTCStatus, RTCConfig, OLEDStatus, OLEDConfig, OLEDDisplayMode, OLEDScreenTimeout } from '../types/hardware';
 import { calculateSHA256 } from '../utils/crypto';
 
 export default function Settings() {
@@ -29,9 +31,16 @@ export default function Settings() {
     secondConfirm?: string;
   } | null>(null);
 
+  // Hardware configuration states
+  const [rtcStatus, setRtcStatus] = useState<RTCStatus | null>(null);
+  const [rtcConfig, setRtcConfig] = useState<RTCConfig | null>(null);
+  const [oledStatus, setOledStatus] = useState<OLEDStatus | null>(null);
+  const [oledConfig, setOledConfig] = useState<OLEDConfig | null>(null);
+
   useEffect(() => {
     loadSystemInfo();
     loadOtaStatus();
+    loadHardwareConfigs();
   }, []);
 
   const loadSystemInfo = async () => {
@@ -52,6 +61,86 @@ export default function Settings() {
       setOtaStatus(status);
     } catch (error) {
       console.error('Failed to load OTA status:', error);
+    }
+  };
+
+  const loadHardwareConfigs = async () => {
+    try {
+      const [rtcStat, rtcConf, oledStat, oledConf] = await Promise.all([
+        hardwareService.getRTCStatus(),
+        hardwareService.getRTCConfig(),
+        hardwareService.getOLEDStatus(),
+        hardwareService.getOLEDConfig(),
+      ]);
+      setRtcStatus(rtcStat);
+      setRtcConfig(rtcConf);
+      setOledStatus(oledStat);
+      setOledConfig(oledConf);
+    } catch (error) {
+      console.error('Failed to load hardware configs:', error);
+    }
+  };
+
+  const handleRTCConfigUpdate = async (updates: Partial<RTCConfig>) => {
+    if (!rtcConfig) return;
+
+    try {
+      const updatedConfig = { ...rtcConfig, ...updates };
+      await hardwareService.updateRTCConfig(updatedConfig);
+      setRtcConfig(updatedConfig);
+      setActionMessage({ type: 'success', text: 'RTC configuration updated' });
+    } catch (error) {
+      setActionMessage({ type: 'error', text: 'Failed to update RTC configuration' });
+      console.error(error);
+    }
+  };
+
+  const handleRTCSync = async () => {
+    try {
+      setActionMessage({ type: 'success', text: 'Syncing RTC...' });
+      await hardwareService.syncRTCTime();
+      await loadHardwareConfigs();
+      setActionMessage({ type: 'success', text: 'RTC synchronized successfully' });
+    } catch (error) {
+      setActionMessage({ type: 'error', text: 'Failed to sync RTC' });
+      console.error(error);
+    }
+  };
+
+  const handleRTCManualTime = async () => {
+    try {
+      const now = new Date();
+      await hardwareService.setManualTime(now.toISOString());
+      await loadHardwareConfigs();
+      setActionMessage({ type: 'success', text: 'RTC time set manually' });
+    } catch (error) {
+      setActionMessage({ type: 'error', text: 'Failed to set manual time' });
+      console.error(error);
+    }
+  };
+
+  const handleOLEDConfigUpdate = async (updates: Partial<OLEDConfig>) => {
+    if (!oledConfig) return;
+
+    try {
+      const updatedConfig = { ...oledConfig, ...updates };
+      await hardwareService.updateOLEDConfig(updatedConfig);
+      setOledConfig(updatedConfig);
+      setActionMessage({ type: 'success', text: 'OLED configuration updated' });
+    } catch (error) {
+      setActionMessage({ type: 'error', text: 'Failed to update OLED configuration' });
+      console.error(error);
+    }
+  };
+
+  const handleOLEDTest = async () => {
+    try {
+      setActionMessage({ type: 'success', text: 'Testing OLED display...' });
+      await hardwareService.testOLEDDisplay();
+      setActionMessage({ type: 'success', text: 'OLED test completed' });
+    } catch (error) {
+      setActionMessage({ type: 'error', text: 'Failed to test OLED' });
+      console.error(error);
     }
   };
 
@@ -482,6 +571,253 @@ export default function Settings() {
                 </>
               )}
             </dl>
+          </div>
+        )}
+
+        {/* RTC Configuration */}
+        {rtcStatus && rtcConfig && (
+          <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60">
+            <h2 className="text-lg font-medium mb-4">RTC Configuration</h2>
+            
+            <div className="space-y-4">
+              {/* RTC Status */}
+              <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</span>
+                  <span className={`px-2 py-1 text-xs rounded-full ${
+                    rtcStatus.available 
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                      : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
+                  }`}>
+                    {rtcStatus.available ? '✓ Available' : '✗ Not Available'}
+                  </span>
+                </div>
+                {rtcStatus.available && (
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    <p>Current Time: {new Date(rtcStatus.currentTime).toLocaleString()}</p>
+                    <p>Is Synced: {rtcStatus.isTimeSynced ? 'Yes' : 'No'}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Timezone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Timezone
+                </label>
+                <select
+                  value={rtcConfig.timezone}
+                  onChange={(e) => handleRTCConfigUpdate({ timezone: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                >
+                  {TIMEZONES.map((tz) => (
+                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Time Format */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Time Format
+                </label>
+                <select
+                  value={rtcConfig.timeFormat}
+                  onChange={(e) => handleRTCConfigUpdate({ timeFormat: e.target.value as '12h' | '24h' })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="12h">12-hour</option>
+                  <option value="24h">24-hour</option>
+                </select>
+              </div>
+
+              {/* Date Format */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Date Format
+                </label>
+                <select
+                  value={rtcConfig.dateFormat}
+                  onChange={(e) => handleRTCConfigUpdate({ dateFormat: e.target.value as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD' })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                </select>
+              </div>
+
+              {/* Sync Priority */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Time Sync Priority
+                </label>
+                <select
+                  value={rtcConfig.syncPriority}
+                  onChange={(e) => handleRTCConfigUpdate({ syncPriority: e.target.value as 'ntp' | 'rtc' | 'manual' })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="ntp">NTP (Internet)</option>
+                  <option value="rtc">RTC Hardware</option>
+                  <option value="manual">Manual Only</option>
+                </select>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2">
+                <button
+                  onClick={handleRTCSync}
+                  className="w-full px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                >
+                  🔄 Sync Time Now
+                </button>
+                <button
+                  onClick={handleRTCManualTime}
+                  className="w-full px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors"
+                >
+                  ⏰ Set to Browser Time
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* OLED Configuration */}
+        {oledStatus && oledConfig && (
+          <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60">
+            <h2 className="text-lg font-medium mb-4">OLED Display Configuration</h2>
+            
+            <div className="space-y-4">
+              {/* OLED Status */}
+              <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</span>
+                  <span className={`px-2 py-1 text-xs rounded-full ${
+                    oledStatus.available 
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                      : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
+                  }`}>
+                    {oledStatus.available ? '✓ Available' : '✗ Not Available'}
+                  </span>
+                </div>
+                {oledStatus.available && (
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    <p>Resolution: {oledStatus.width} x {oledStatus.height}</p>
+                    <p>Active: {oledStatus.isActive ? 'Yes' : 'No'}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Enable/Disable */}
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Enable Display
+                </label>
+                <button
+                  onClick={() => handleOLEDConfigUpdate({ enabled: !oledConfig.enabled })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    oledConfig.enabled ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    oledConfig.enabled ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </div>
+
+              {/* Brightness */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Brightness: {oledConfig.brightness}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="255"
+                  value={oledConfig.brightness}
+                  onChange={(e) => handleOLEDConfigUpdate({ brightness: parseInt(e.target.value) })}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Timeout */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Screen Timeout
+                </label>
+                <select
+                  value={oledConfig.timeout}
+                  onChange={(e) => handleOLEDConfigUpdate({ timeout: e.target.value as OLEDScreenTimeout })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="always-on">Always On</option>
+                  <option value="30s">30 seconds</option>
+                  <option value="1m">1 minute</option>
+                  <option value="5m">5 minutes</option>
+                  <option value="10m">10 minutes</option>
+                </select>
+              </div>
+
+              {/* Rotation */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Rotation
+                </label>
+                <select
+                  value={oledConfig.rotation}
+                  onChange={(e) => handleOLEDConfigUpdate({ rotation: parseInt(e.target.value) as 0 | 90 | 180 | 270 })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="0">0°</option>
+                  <option value="90">90°</option>
+                  <option value="180">180°</option>
+                  <option value="270">270°</option>
+                </select>
+              </div>
+
+              {/* Default Screen */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Default Screen
+                </label>
+                <select
+                  value={oledConfig.defaultScreen}
+                  onChange={(e) => handleOLEDConfigUpdate({ defaultScreen: e.target.value as OLEDDisplayMode })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="clock">Clock</option>
+                  <option value="ip-address">IP Address</option>
+                  <option value="status">Status</option>
+                  <option value="sequence">Sequence</option>
+                  <option value="rotating">Rotating</option>
+                </select>
+              </div>
+
+              {/* Screen Saver */}
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Screen Saver
+                </label>
+                <button
+                  onClick={() => handleOLEDConfigUpdate({ screenSaver: !oledConfig.screenSaver })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    oledConfig.screenSaver ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    oledConfig.screenSaver ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </div>
+
+              {/* Test Display */}
+              <button
+                onClick={handleOLEDTest}
+                className="w-full px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white transition-colors"
+              >
+                🧪 Test Display
+              </button>
+            </div>
           </div>
         )}
 

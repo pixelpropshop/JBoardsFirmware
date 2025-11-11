@@ -32,7 +32,7 @@ const SequenceEditor: React.FC = () => {
   const [selectedPresetId, setSelectedPresetId] = useState('');
   const [newStepDuration, setNewStepDuration] = useState(30);
   const [newStepTransition, setNewStepTransition] = useState<TransitionType>('fade');
-  const [newStepParameters, setNewStepParameters] = useState<Record<string, any>>({});
+  const [, setNewStepParameters] = useState<Record<string, any>>({});
 
   useEffect(() => {
     loadData();

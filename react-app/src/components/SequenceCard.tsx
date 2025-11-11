@@ -41,7 +41,6 @@ const SequenceCard: React.FC<SequenceCardProps> = ({ sequence, onPlay, onEdit, o
   const sequenceIcon = sequence.type === 'fseq' ? '🎄' : '🎵';
   
   // Determine step count
-  const stepCount = sequence.type === 'effect' ? sequence.steps.length : 'FSEQ';
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-300 dark:border-gray-700 hover:border-blue-500 transition-colors">
