@@ -51,27 +51,26 @@ npm run build
 
 The built files will be in the `dist` folder.
 
-## TODO: API Integration
+## API Integration
 
-This application currently uses **stub data** throughout all components. To integrate with the actual JSense Board API:
+The application uses a service layer architecture with mock data fallback for development:
 
-1. Create an API service module (e.g., `src/services/api.ts`)
-2. Replace stub data in each page component with API calls
-3. Add loading states and error handling
-4. Implement data fetching with useEffect hooks
-5. Consider using a state management solution (React Query, Zustand, etc.)
+- **Base API Service**: `src/services/api.ts` - Provides centralized API configuration and base URL management
+- **Feature Services**: Individual service modules for each feature area with mock data fallback in development mode
+- **Environment Configuration**: `.env.development` and `.env.production` files control API endpoint behavior
 
-### Files to Update for API Integration:
+### Service Modules:
 
-- `src/pages/Dashboard.tsx` - Replace system info and LED channels stub data
-- `src/pages/Effects.tsx` - Replace effects list stub data
-- `src/pages/Sequences.tsx` - Replace sequences stub data
-- `src/pages/Audio.tsx` - Replace audio settings stub data
-- `src/pages/Sensors.tsx` - Replace sensor readings stub data
-- `src/pages/Network.tsx` - Replace network config stub data
-- `src/pages/Files.tsx` - Replace files list stub data
-- `src/pages/About.tsx` - Replace system info stub data
-- `src/components/Header.tsx` - Implement actual reboot functionality
+- `src/services/boardService.ts` - Board management and LED channels
+- `src/services/effectsService.ts` - LED effects and patterns
+- `src/services/sequenceService.ts` - Effect sequences
+- `src/services/audioService.ts` - Audio files and playback
+- `src/services/networkService.ts` - WiFi and network configuration
+- `src/services/filesService.ts` - File management
+- `src/services/systemService.ts` - System information and operations
+- `src/services/jboardService.ts` - JBoard network device discovery and management
+
+The application automatically uses mock data when the ESP32 backend is unavailable, allowing for seamless development and testing.
 
 ## Design Notes
 

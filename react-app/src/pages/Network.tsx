@@ -5,6 +5,7 @@ import { validateWiFiConfig, validateAPConfig, validateHostnameConfig, validateW
 import Toggle from '../components/Toggle';
 import ConnectionStatus from '../components/ConnectionStatus';
 import SignalStrength from '../components/SignalStrength';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function Network() {
   // Loading states
@@ -60,6 +61,8 @@ export default function Network() {
   const [availableNetworks, setAvailableNetworks] = useState<ScanResult[]>([]);
   const [showNetworkList, setShowNetworkList] = useState(false);
   const [resettingPortal, setResettingPortal] = useState(false);
+  const [confirmDeleteProfile, setConfirmDeleteProfile] = useState<string | null>(null);
+  const [confirmResetPortal, setConfirmResetPortal] = useState(false);
 
   // Load initial configuration
   useEffect(() => {
@@ -279,9 +282,11 @@ export default function Network() {
     }
   };
 
-  const handleDeleteProfile = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this WiFi profile?')) return;
+  const handleDeleteProfile = (id: string) => {
+    setConfirmDeleteProfile(id);
+  };
 
+  const performDeleteProfile = async (id: string) => {
     try {
       const result = await networkService.deleteWiFiProfile(id);
       if (result.success) {
@@ -354,11 +359,11 @@ export default function Network() {
   };
 
   // Captive Portal handlers
-  const handleResetCaptivePortal = async () => {
-    if (!confirm('Are you sure you want to reset the captive portal? It will show again on the next connection to the Access Point.')) {
-      return;
-    }
+  const handleResetCaptivePortal = () => {
+    setConfirmResetPortal(true);
+  };
 
+  const performResetCaptivePortal = async () => {
     setResettingPortal(true);
     setMessage(null);
 
@@ -1040,6 +1045,37 @@ export default function Network() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Delete Profile Confirmation Dialog */}
+      {confirmDeleteProfile && (() => {
+        const profile = wifiProfiles.find(p => p.id === confirmDeleteProfile);
+        return profile ? (
+          <ConfirmDialog
+            title="Delete WiFi Profile"
+            message={`Delete WiFi profile "${profile.name}"? This action cannot be undone.`}
+            onConfirm={() => {
+              performDeleteProfile(confirmDeleteProfile);
+              setConfirmDeleteProfile(null);
+            }}
+            onCancel={() => setConfirmDeleteProfile(null)}
+            dangerous={true}
+          />
+        ) : null;
+      })()}
+
+      {/* Reset Captive Portal Confirmation Dialog */}
+      {confirmResetPortal && (
+        <ConfirmDialog
+          title="Reset Captive Portal"
+          message="Reset the captive portal? It will show again on the next connection to the Access Point."
+          onConfirm={() => {
+            performResetCaptivePortal();
+            setConfirmResetPortal(false);
+          }}
+          onCancel={() => setConfirmResetPortal(false)}
+          dangerous={false}
+        />
       )}
     </div>
   );

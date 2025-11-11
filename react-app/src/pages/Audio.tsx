@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { audioService } from '../services/audioService';
 import { AudioFile } from '../types/audio';
 import { api } from '../services/api';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function Audio() {
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
@@ -14,6 +15,7 @@ export default function Audio() {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.7);
   const [audioFrequencies, setAudioFrequencies] = useState<number[]>(new Array(32).fill(0));
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -69,16 +71,22 @@ export default function Audio() {
     }
   };
 
-  const handleDelete = async (filename: string) => {
-    if (!confirm(`Are you sure you want to delete "${filename}"?`)) return;
+  const handleDelete = (filename: string) => {
+    setConfirmDelete(filename);
+  };
+
+  const performDelete = async () => {
+    if (!confirmDelete) return;
 
     try {
       setError(null);
-      await audioService.deleteAudioFile(filename);
+      await audioService.deleteAudioFile(confirmDelete);
       await loadAudioFiles();
     } catch (err) {
       setError('Failed to delete audio file');
       console.error(err);
+    } finally {
+      setConfirmDelete(null);
     }
   };
 
@@ -424,6 +432,16 @@ export default function Audio() {
           </div>
         )}
       </div>
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete Audio File"
+          message={`Are you sure you want to delete "${confirmDelete}"? This action cannot be undone.`}
+          onConfirm={performDelete}
+          onCancel={() => setConfirmDelete(null)}
+          dangerous
+        />
+      )}
     </div>
   );
 }

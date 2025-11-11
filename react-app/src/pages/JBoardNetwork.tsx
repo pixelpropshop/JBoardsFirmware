@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { jboardService } from '../services/jboardService';
 import type { JBoardDevice, ThisDevice } from '../types/jboard';
 import { DeviceType, DeviceCapability } from '../types/jboard';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function JBoardNetwork() {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ export default function JBoardNetwork() {
   const [broadcastType, setBroadcastType] = useState('');
   const [broadcastData, setBroadcastData] = useState('{}');
   const [broadcasting, setBroadcasting] = useState(false);
+  const [confirmUnpair, setConfirmUnpair] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -106,9 +108,11 @@ export default function JBoardNetwork() {
     setDiscoveredDevices([]);
   };
 
-  const handleUnpair = async (mac: string) => {
-    if (!confirm('Unpair this device?')) return;
+  const handleUnpair = (mac: string) => {
+    setConfirmUnpair(mac);
+  };
 
+  const performUnpair = async (mac: string) => {
     try {
       const result = await jboardService.unpairDevice(mac);
       if (result.success) {
@@ -598,6 +602,20 @@ export default function JBoardNetwork() {
           </div>
         )}
       </div>
+
+      {/* Unpair Confirmation Dialog */}
+      {confirmUnpair && (
+        <ConfirmDialog
+          title="Unpair Device"
+          message="Unpair this device?"
+          onConfirm={() => {
+            performUnpair(confirmUnpair);
+            setConfirmUnpair(null);
+          }}
+          onCancel={() => setConfirmUnpair(null)}
+          dangerous={true}
+        />
+      )}
     </div>
   );
 }

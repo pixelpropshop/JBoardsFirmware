@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { filesService } from '../services/filesService';
 import { FileInfo, FileType, StorageInfo } from '../types/files';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function Files() {
   const [files, setFiles] = useState<FileInfo[]>([]);
@@ -15,6 +16,7 @@ export default function Files() {
   const [previewFile, setPreviewFile] = useState<FileInfo | null>(null);
   const [previewContent, setPreviewContent] = useState<string>('');
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<FileInfo | null>(null);
 
   useEffect(() => {
     loadData();
@@ -65,9 +67,11 @@ export default function Files() {
     }
   };
 
-  const handleDelete = async (file: FileInfo) => {
-    if (!confirm(`Delete "${file.filename}"?`)) return;
+  const handleDelete = (file: FileInfo) => {
+    setConfirmDelete(file);
+  };
 
+  const performDelete = async (file: FileInfo) => {
     try {
       setError(null);
       const result = await filesService.deleteFile(file.path);
@@ -504,6 +508,20 @@ export default function Files() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete File"
+          message={`Delete "${confirmDelete.filename}"? This action cannot be undone.`}
+          onConfirm={() => {
+            performDelete(confirmDelete);
+            setConfirmDelete(null);
+          }}
+          onCancel={() => setConfirmDelete(null)}
+          dangerous={true}
+        />
       )}
     </div>
   );
