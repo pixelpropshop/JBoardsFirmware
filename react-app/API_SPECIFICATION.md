@@ -2350,6 +2350,325 @@ server.on("/api/files/audio", HTTP_POST,
 
 ---
 
+## General File Management API Endpoints
+
+### 54. Get File List
+
+**Endpoint:** `GET /api/files/list`
+
+**Description:** Retrieve list of all files on SD card (all types).
+
+**Query Parameters:**
+- type: Optional filter by file type (audio, fseq, config, log, backup, text, other)
+
+**Response:**
+```json
+[
+  {
+    "filename": "christmas_carol.mp3",
+    "path": "/sd/audio/christmas_carol.mp3",
+    "size": 3584000,
+    "type": "audio",
+    "mimeType": "audio/mpeg",
+    "lastModified": "2025-01-08T10:30:00Z"
+  },
+  {
+    "filename": "board_config.json",
+    "path": "/sd/config/board_config.json",
+    "size": 2048,
+    "type": "config",
+    "mimeType": "application/json",
+    "lastModified": "2025-01-05T14:20:00Z"
+  },
+  {
+    "filename": "system.log",
+    "path": "/sd/logs/system.log",
+    "size": 16384,
+    "type": "log",
+    "mimeType": "text/plain",
+    "lastModified": "2025-01-10T09:15:00Z"
+  }
+]
+```
+
+**Notes:**
+- type: audio, fseq, config, log, backup, text, other
+- Returns all files from SD card
+- Used by Files page to show unified file browser
+- Includes audio and FSEQ files for centralized management
+
+---
+
+### 55. Get Storage Information
+
+**Endpoint:** `GET /api/files/storage`
+
+**Description:** Get SD card storage statistics.
+
+**Response:**
+```json
+{
+  "totalBytes": 8589934592,
+  "usedBytes": 1288490188,
+  "freeBytes": 7301444404,
+  "breakdown": {
+    "audio": 11776000,
+    "fseq": 6144000,
+    "config": 3072,
+    "log": 20480,
+    "backup": 524288,
+    "other": 512
+  }
+}
+```
+
+**Notes:**
+- totalBytes: Total SD card capacity in bytes
+- usedBytes: Used storage in bytes
+- freeBytes: Available storage in bytes
+- breakdown: Storage usage by file type (in bytes)
+- Used for storage visualization on Files page
+
+---
+
+### 56. Upload General File
+
+**Endpoint:** `POST /api/files/upload`
+
+**Description:** Upload any file type to SD card.
+
+**Request:** `multipart/form-data`
+
+**Form Fields:**
+- `file`: File to upload (required)
+- `path`: Optional destination path (default: /sd/files/)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "File uploaded successfully",
+  "file": {
+    "filename": "backup_config.zip",
+    "path": "/sd/files/backup_config.zip",
+    "size": 524288,
+    "type": "backup",
+    "mimeType": "application/zip",
+    "lastModified": "2025-01-10T11:30:00Z"
+  }
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "SD card full or invalid file"
+}
+```
+
+**Notes:**
+- Supports any file type
+- File size limit: 100MB (configurable)
+- Auto-detects file type from extension
+- Optional custom path for organization
+
+---
+
+### 57. Delete File
+
+**Endpoint:** `DELETE /api/files/delete`
+
+**Description:** Delete a file from SD card.
+
+**Request Body:**
+```json
+{
+  "path": "/sd/config/old_config.json"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "File deleted successfully"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "File not found or in use"
+}
+```
+
+**Notes:**
+- path: Full file path including filename
+- Cannot delete files in use by sequences
+- Permanent deletion
+- Validates file exists before deletion
+
+---
+
+### 58. Download File
+
+**Endpoint:** `GET /api/files/download/{path}`
+
+**Description:** Download a file from SD card.
+
+**Response:** File binary data with appropriate headers
+
+**Headers:**
+```
+Content-Type: <file mime type>
+Content-Disposition: attachment; filename="<filename>"
+Content-Length: <file size>
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "File not found"
+}
+```
+
+**Notes:**
+- path: URL-encoded file path (e.g., sd/config/board_config.json)
+- Triggers browser download
+- Content-Type matches file type
+- Works for all file types
+
+---
+
+### 59. Preview File
+
+**Endpoint:** `POST /api/files/preview`
+
+**Description:** Get text content of config/log/text files for preview.
+
+**Request Body:**
+```json
+{
+  "path": "/sd/config/board_config.json"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "content": "{\n  \"version\": \"1.0\",\n  \"ledCount\": 300,\n  \"brightness\": 80\n}"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "File not found or cannot preview this file type"
+}
+```
+
+**Notes:**
+- Only works for text-based files (config, log, text types)
+- Returns raw text content
+- Max preview size: 100KB (truncate if larger)
+- Used by Files page preview modal
+- Not available for binary files (audio, fseq, backup)
+
+---
+
+## File Type Detection
+
+Files are automatically categorized by extension:
+
+| Type | Extensions | Icon | Color |
+|------|-----------|------|-------|
+| audio | mp3, wav, ogg, m4a, flac | 🎵 | Purple |
+| fseq | fseq | 🎄 | Blue |
+| config | json, cfg, conf, ini | ⚙️ | Green |
+| log | log | 📋 | Yellow |
+| backup | zip, tar, gz, bak | 💾 | Orange |
+| text | txt | 📄 | Gray |
+| other | all others | 📁 | Gray |
+
+---
+
+## File Management Implementation Notes
+
+### SD Card Structure
+
+```
+/sd/
+├── audio/           # Audio files (MP3, WAV, OGG)
+├── sequences/       # FSEQ sequence files
+├── config/          # Configuration files (JSON, INI)
+├── logs/            # System log files
+├── backups/         # Backup archives
+└── files/           # General user files
+```
+
+### Security Considerations
+
+1. **Path Validation:**
+   - Prevent path traversal attacks (../)
+   - Validate file paths are within /sd/ directory
+   - Sanitize filenames (alphanumeric, hyphens, underscores, dots)
+
+2. **File Size Limits:**
+   - General files: 100MB max
+   - Audio files: 50MB max (separate endpoint)
+   - FSEQ files: 10MB max (separate endpoint)
+   - Preview: 100KB max
+
+3. **File Usage Checks:**
+   - Check if file is referenced by sequences before deletion
+   - Prevent deletion of critical system files
+   - Lock files during upload/download
+
+### ESP32 Implementation Example
+
+```cpp
+// List files endpoint
+server.on("/api/files/list", HTTP_GET, [](AsyncWebServerRequest *request){
+  StaticJsonDocument<4096> doc;
+  JsonArray files = doc.to<JsonArray>();
+  
+  // Recursively scan SD card
+  scanDirectory("/sd", files);
+  
+  String response;
+  serializeJson(doc, response);
+  request->send(200, "application/json", response);
+});
+
+// Helper function to scan directory
+void scanDirectory(const char* path, JsonArray& files) {
+  File root = SD.open(path);
+  File file = root.openNextFile();
+  
+  while(file) {
+    if (!file.isDirectory()) {
+      JsonObject fileObj = files.createNestedObject();
+      fileObj["filename"] = file.name();
+      fileObj["path"] = String(path) + "/" + String(file.name());
+      fileObj["size"] = file.size();
+      fileObj["type"] = detectFileType(file.name());
+      fileObj["lastModified"] = getFileModTime(file);
+    } else {
+      // Recursively scan subdirectories
+      scanDirectory(file.path(), files);
+    }
+    file = root.openNextFile();
+  }
+}
+```
+
+---
+
 ## Future Enhancements
 
 1. **WebSocket Support:**
@@ -2403,3 +2722,12 @@ server.on("/api/files/audio", HTTP_POST,
    - Batch upload support
    - Folder organization
    - Audio format conversion
+
+9. **File Management Enhancements:**
+   - Bulk file operations (multi-select delete/download)
+   - Drag & drop upload interface
+   - Folder creation and management
+   - File renaming
+   - File compression/decompression
+   - Search by content (for text files)
+   - File tagging and metadata
