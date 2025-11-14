@@ -1,6 +1,24 @@
 {
   "versions": [
     {
+      "version": "1.0.4",
+      "buildDate": "2025-11-14",
+      "stable": true,
+      "changelog": "Version 1.0.4 - Reboot UX Improvements\n- Added reboot detection and auto-refresh after firmware update\n- Shows 15-second countdown during device reboot\n- Automatically polls device for availability\n- Auto-refreshes UI when device comes back online\n- Improved user experience during OTA updates\n- All features from v1.0.3 included",
+      "checksum": "0F15795ED4E9CFA3EEBE16223AB159118C0D9326461D8BA027E5C71FA4D47E62",
+      "fileSize": 1108317,
+      "minHardwareVersion": "1.0"
+    },
+    {
+      "version": "1.0.3",
+      "buildDate": "2024-11-14",
+      "stable": true,
+      "changelog": "Version 1.0.3 - HTTP Crypto Fix\n- Fixed Web Crypto API error when accessing via HTTP (device IP)\n- Added crypto availability checks for SHA256 verification\n- Graceful fallback when checksums unavailable over HTTP\n- Removed deprecated captive portal feature\n- Updated React app with all fixes\n- All features from v1.0.2 included",
+      "checksum": "63E198DEA1923EAAB539A1225C371D38CD8FA51839918F67728C20BC840606A5",
+      "fileSize": 1108317,
+      "minHardwareVersion": "1.0"
+    },
+    {
       "version": "1.0.2",
       "buildDate": "2024-11-14",
       "stable": true,
