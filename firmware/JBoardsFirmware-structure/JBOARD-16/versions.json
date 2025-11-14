@@ -1,0 +1,13 @@
+{
+  "versions": [
+    {
+      "version": "1.0.0",
+      "buildDate": "2024-11-14",
+      "stable": true,
+      "changelog": "Initial release of JSenseBoard firmware\n- Full 16-channel LED control with FastLED\n- WiFi network management with multi-profile support\n- Web-based configuration interface\n- RTC support with multiple time sources\n- OLED display with multiple screen modes\n- Multi-sensor support (accelerometer, gyroscope, environmental)\n- JBoard network for synchronized multi-board control\n- Sequence playback and effects management\n- OTA firmware update support\n- Configuration import/export",
+      "checksum": "placeholder_sha256_checksum_here",
+      "fileSize": 0,
+      "minHardwareVersion": "1.0"
+    }
+  ]
+}
