@@ -1,6 +1,15 @@
 {
   "versions": [
     {
+      "version": "1.0.2",
+      "buildDate": "2024-11-14",
+      "stable": true,
+      "changelog": "Version 1.0.2 - Device UI Test\n- Testing OTA updates from device UI\n- Verified GitHub-to-device update flow\n- Full end-to-end update validation\n- All features from v1.0.1 included",
+      "checksum": "276E08AFD1DDC9D087FAE9ED33E8D2ED6BF67957EEA09F6EA0CA2949849F5E38",
+      "fileSize": 1108317,
+      "minHardwareVersion": "1.0"
+    },
+    {
       "version": "1.0.1",
       "buildDate": "2024-11-14",
       "stable": true,
