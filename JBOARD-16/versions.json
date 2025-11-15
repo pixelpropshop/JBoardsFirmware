@@ -1,6 +1,15 @@
 {
   "versions": [
     {
+      "version": "1.0.6",
+      "buildDate": "2025-11-14",
+      "stable": true,
+      "changelog": "Version 1.0.6 - Backup Version Tracking\n- Added NVS storage for backup firmware version\n- OTA status endpoint now shows actual backup version instead of 'unknown'\n- System stores current version before OTA update begins\n- Enhanced firmware recovery information display\n- Route registration order fix from v1.0.5 included\n- All features from v1.0.4 included",
+      "checksum": "E54B0EC18CB467A215A2C7AF4F2DCB2A1004052AFA7A55280EC47335F39D9C5F",
+      "fileSize": 1108477,
+      "minHardwareVersion": "1.0"
+    },
+    {
       "version": "1.0.4",
       "buildDate": "2025-11-14",
       "stable": true,
