@@ -2,8 +2,10 @@ import { useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { BoardProvider } from './contexts/BoardContext'
 import { ToastProvider, useToast } from './contexts/ToastContext'
+import { UpdateProvider } from './contexts/UpdateContext'
 import { setToastHandler } from './utils/errorHandler'
 import Layout from './components/Layout'
+import { UpdateNotification } from './components/UpdateNotification'
 import Dashboard from './pages/Dashboard'
 import Effects from './pages/Effects'
 import Sequences from './pages/Sequences'
@@ -15,8 +17,6 @@ import Network from './pages/Network'
 import Files from './pages/Files'
 import About from './pages/About'
 import Settings from './pages/Settings'
-import CaptivePortal from './pages/CaptivePortal'
-import CaptivePortalSetup from './pages/CaptivePortalSetup'
 import JBoardNetwork from './pages/JBoardNetwork'
 import JBoardDeviceDetails from './pages/JBoardDeviceDetails'
 
@@ -29,11 +29,8 @@ function AppContent() {
 
   return (
     <BoardProvider>
+      <UpdateNotification />
       <Routes>
-      {/* Captive Portal Routes (no layout) */}
-      <Route path="/captive-portal" element={<CaptivePortal />} />
-      <Route path="/captive-portal/setup" element={<CaptivePortalSetup />} />
-      
       {/* Main App Routes (with layout) */}
       <Route path="/" element={<Layout />}>
         <Route index element={<Dashboard />} />
@@ -59,7 +56,9 @@ function AppContent() {
 function App() {
   return (
     <ToastProvider>
-      <AppContent />
+      <UpdateProvider>
+        <AppContent />
+      </UpdateProvider>
     </ToastProvider>
   )
 }

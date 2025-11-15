@@ -6,6 +6,7 @@ JBoardNetworkManager* JBoardNetworkManager::_instance = nullptr;
 
 JBoardNetworkManager::JBoardNetworkManager() {
     _initialized = false;
+    _enabled = true;  // Default to enabled
     _scanning = false;
     _scanStartTime = 0;
 }
@@ -19,6 +20,20 @@ void JBoardNetworkManager::begin() {
     bool prefsOk = _prefs.begin("jboard", false);
     if (!prefsOk) {
         Serial.println("[JBoard] Warning: Failed to open preferences, using defaults");
+    }
+    
+    // Load enabled state from preferences (default to true)
+    if (prefsOk) {
+        _enabled = _prefs.getBool("enabled", true);
+    }
+    
+    // If not enabled, skip initialization
+    if (!_enabled) {
+        Serial.println("[JBoard] JBoard Network is disabled");
+        if (prefsOk) {
+            _prefs.end();
+        }
+        return;
     }
     
     // Initialize this device
@@ -269,6 +284,47 @@ std::vector<JBoardMessage> JBoardNetworkManager::getReceivedMessages(int limit) 
 
 void JBoardNetworkManager::clearMessages() {
     _receivedMessages.clear();
+}
+
+bool JBoardNetworkManager::isEnabled() {
+    return _enabled;
+}
+
+void JBoardNetworkManager::setEnabled(bool enabled) {
+    #if FEATURE_JBOARD_NETWORK
+    
+    if (_enabled == enabled) {
+        return;  // No change
+    }
+    
+    _enabled = enabled;
+    
+    // Save to preferences
+    if (_prefs.begin("jboard", false)) {
+        _prefs.putBool("enabled", enabled);
+        _prefs.end();
+        Serial.print("[JBoard] Network ");
+        Serial.println(enabled ? "enabled" : "disabled");
+    }
+    
+    if (enabled) {
+        // Re-initialize ESP-NOW
+        if (!_initialized) {
+            begin();
+        }
+    } else {
+        // Deinitialize ESP-NOW
+        if (_initialized) {
+            Serial.println("[JBoard] Deinitializing ESP-NOW...");
+            esp_now_deinit();
+            _initialized = false;
+            _peers.clear();
+            _scannedDevices.clear();
+            _receivedMessages.clear();
+        }
+    }
+    
+    #endif
 }
 
 // ESP-NOW callbacks

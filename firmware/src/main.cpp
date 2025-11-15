@@ -353,6 +353,9 @@ void initNetwork() {
   // Initialize network manager
   networkManager.begin();
   
+  // Set JBoard network manager reference for runtime enable/disable support
+  networkManager.setJBoardNetworkManager(&jboardManager);
+  
   // Network manager handles WiFi connection and AP fallback automatically
   // If WiFi connection fails, auto-reconnect will start AP after max attempts
   

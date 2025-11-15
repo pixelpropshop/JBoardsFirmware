@@ -264,7 +264,7 @@ export default function Pixels() {
           <select
             value={selectedEffect?.id || ''}
             onChange={(e) => handleEffectChange(e.target.value)}
-            className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+            className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-lg"
           >
             {effects.map(effect => (
               <option key={effect.id} value={effect.id}>
@@ -394,7 +394,7 @@ function EffectParameterControl({
               type="text"
               value={value}
               onChange={(e) => onChange(e.target.value)}
-              className="input flex-1 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+              className="input flex-1 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-lg"
             />
           </div>
         </div>
@@ -437,7 +437,7 @@ function EffectParameterControl({
           <select
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+            className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-lg"
           >
             {parameter.options?.map(opt => (
               <option key={opt.value} value={opt.value}>
@@ -459,7 +459,7 @@ function EffectParameterControl({
             step={parameter.step || 1}
             value={value}
             onChange={(e) => onChange(Number(e.target.value))}
-            className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+            className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-lg"
           />
         </div>
       )
@@ -524,7 +524,7 @@ function OutputCard({
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+              className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-lg"
             />
           </div>
 
@@ -533,7 +533,7 @@ function OutputCard({
             <select
               value={formData.gpio}
               onChange={(e) => setFormData({ ...formData, gpio: Number(e.target.value) })}
-              className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+              className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-lg"
             >
               {boardInfo.availableGPIOs.map(gpio => (
                 <option key={gpio} value={gpio}>GPIO {gpio}</option>
@@ -549,7 +549,7 @@ function OutputCard({
               max={boardInfo.maxPixelsPerOutput}
               value={formData.pixelCount}
               onChange={(e) => setFormData({ ...formData, pixelCount: Number(e.target.value) })}
-              className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+              className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-lg"
             />
           </div>
 
@@ -558,7 +558,7 @@ function OutputCard({
             <select
               value={formData.pixelType}
               onChange={(e) => setFormData({ ...formData, pixelType: e.target.value as PixelType })}
-              className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+              className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-lg"
             >
               {Object.values(PixelType).map(type => (
                 <option key={type} value={type}>{type}</option>
@@ -571,7 +571,7 @@ function OutputCard({
             <select
               value={formData.colorOrder}
               onChange={(e) => setFormData({ ...formData, colorOrder: e.target.value as ColorOrder })}
-              className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+              className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-lg"
             >
               {Object.values(ColorOrder).map(order => (
                 <option key={order} value={order}>{order}</option>
@@ -584,7 +584,7 @@ function OutputCard({
             <select
               value={formData.voltage}
               onChange={(e) => setFormData({ ...formData, voltage: Number(e.target.value) })}
-              className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+              className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-lg"
             >
               <option value={5}>5V</option>
               <option value={12}>12V</option>
@@ -600,7 +600,7 @@ function OutputCard({
               step="100"
               value={formData.maxCurrent}
               onChange={(e) => setFormData({ ...formData, maxCurrent: Number(e.target.value) })}
-              className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+              className="input w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-lg"
             />
           </div>
         </div>

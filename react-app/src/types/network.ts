@@ -53,13 +53,6 @@ export interface AutoReconnectConfig {
   fallbackToAP: boolean; // Enable AP mode after max attempts
 }
 
-export interface CaptivePortalStatus {
-  isActive: boolean; // Whether the portal is currently active
-  isCompleted: boolean; // Whether the user has completed the setup
-  apOnlyMode: boolean; // Whether user chose AP-only mode
-  completedAt?: string; // ISO timestamp of when setup was completed
-}
-
 export interface ScanResult {
   ssid: string;
   rssi: number;

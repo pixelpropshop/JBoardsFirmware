@@ -1,5 +1,5 @@
 import { api } from './api';
-import { calculateSHA256 } from '../utils/crypto';
+import { calculateSHA256, isCryptoAvailable } from '../utils/crypto';
 import type {
   SystemInfo,
   SystemHealth,
@@ -9,6 +9,7 @@ import type {
   FirmwareUpdateResponse,
   FirmwareUpdateProgress,
   SystemActionResponse,
+  RTCTime,
 } from '../types/system';
 
 // Mock data for development
@@ -180,28 +181,39 @@ export const systemService = {
     try {
       // Stage 1: Verify file checksum if provided
       if (expectedChecksum) {
-        progressCallback?.({
-          stage: 'verifying',
-          progress: 0,
-          message: 'Calculating file checksum...',
-        });
+        // Check if crypto is available before attempting checksum calculation
+        if (!isCryptoAvailable()) {
+          console.warn('Web Crypto API not available, skipping checksum verification');
+          // Continue without checksum verification
+        } else {
+          progressCallback?.({
+            stage: 'verifying',
+            progress: 0,
+            message: 'Calculating file checksum...',
+          });
 
-        const actualChecksum = await calculateSHA256(file);
-        
-        progressCallback?.({
-          stage: 'verifying',
-          progress: 100,
-          message: 'Checksum calculated',
-        });
+          try {
+            const actualChecksum = await calculateSHA256(file);
+            
+            progressCallback?.({
+              stage: 'verifying',
+              progress: 100,
+              message: 'Checksum calculated',
+            });
 
-        if (actualChecksum.toLowerCase() !== expectedChecksum.toLowerCase()) {
-          return {
-            success: false,
-            message: 'Firmware file checksum verification failed',
-            stage: 'error',
-            error: 'Checksum mismatch',
-            checksumVerified: false,
-          };
+            if (actualChecksum.toLowerCase() !== expectedChecksum.toLowerCase()) {
+              return {
+                success: false,
+                message: 'Firmware file checksum verification failed',
+                stage: 'error',
+                error: 'Checksum mismatch',
+                checksumVerified: false,
+              };
+            }
+          } catch (error) {
+            console.error('Checksum calculation failed:', error);
+            // Continue without checksum verification
+          }
         }
       }
 
@@ -384,6 +396,41 @@ export const systemService = {
   },
 
   /**
+   * Import configuration from JSON file
+   */
+  async importConfig(file: File): Promise<SystemActionResponse> {
+    try {
+      // Read and validate JSON file
+      const text = await file.text();
+      const config = JSON.parse(text);
+
+      const response = await api.fetch<SystemActionResponse>('/api/system/config/import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config),
+      });
+
+      return response;
+    } catch (error) {
+      console.warn('Failed to import config via API:', error);
+
+      if (error instanceof SyntaxError) {
+        return {
+          success: false,
+          message: 'Invalid JSON file',
+        };
+      }
+
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to import configuration',
+      };
+    }
+  },
+
+  /**
    * Clear system logs
    */
   async clearLogs(): Promise<SystemActionResponse> {
@@ -400,6 +447,22 @@ export const systemService = {
         success: true,
         message: 'Logs cleared successfully (mock)',
       };
+    }
+  },
+
+  /**
+   * Get current RTC time
+   */
+  async getRTCTime(): Promise<RTCTime | null> {
+    try {
+      const response = await api.fetch<RTCTime>('/api/hardware/rtc/time', {
+        method: 'GET',
+      });
+
+      return response;
+    } catch (error) {
+      console.warn('Failed to fetch RTC time from API:', error);
+      return null;
     }
   },
 

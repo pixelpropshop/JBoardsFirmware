@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { systemService } from '../services/systemService';
 import { firmwareService } from '../services/firmwareService';
 import { hardwareService, TIMEZONES } from '../services/hardwareService';
+import { useUpdate } from '../contexts/UpdateContext';
 import type { SystemInfo, FirmwareUpdateProgress } from '../types/system';
 import type { UpdateCheckResult, OTAStatus } from '../types/firmware';
 import type { RTCStatus, RTCConfig, OLEDStatus, OLEDConfig, OLEDDisplayMode, OLEDScreenTimeout } from '../types/hardware';
-import { calculateSHA256 } from '../utils/crypto';
+import { calculateSHA256, isCryptoAvailable } from '../utils/crypto';
 
 export default function Settings() {
+  const { autoCheckEnabled, setAutoCheckEnabled, checkInterval, setCheckInterval } = useUpdate();
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploadingFirmware, setUploadingFirmware] = useState(false);
@@ -36,6 +38,8 @@ export default function Settings() {
   const [rtcConfig, setRtcConfig] = useState<RTCConfig | null>(null);
   const [oledStatus, setOledStatus] = useState<OLEDStatus | null>(null);
   const [oledConfig, setOledConfig] = useState<OLEDConfig | null>(null);
+  const [isRebooting, setIsRebooting] = useState(false);
+  const [rebootCountdown, setRebootCountdown] = useState(0);
 
   useEffect(() => {
     loadSystemInfo();
@@ -261,16 +265,25 @@ export default function Settings() {
       return;
     }
 
-    // Calculate checksum for verification
-    if (showAdvancedOptions) {
+    // Calculate checksum for verification (only works over HTTPS or localhost)
+    if (showAdvancedOptions && isCryptoAvailable()) {
       setCalculatingChecksum(true);
       try {
         const checksum = await calculateSHA256(file);
         setFileChecksum(checksum);
       } catch (error) {
         console.error('Failed to calculate checksum:', error);
+        setActionMessage({ 
+          type: 'error', 
+          text: 'Checksum calculation failed. Continuing without verification.' 
+        });
       }
       setCalculatingChecksum(false);
+    } else if (showAdvancedOptions && !isCryptoAvailable()) {
+      setActionMessage({ 
+        type: 'error', 
+        text: 'Checksum calculation requires HTTPS. Continuing without verification.' 
+      });
     }
 
     // Show confirmation dialog
@@ -278,6 +291,56 @@ export default function Settings() {
       title: 'Upload Firmware',
       message: `Upload firmware "${file.name}" (${systemService.formatBytes(file.size)})? Device will restart after update.`,
       onConfirm: () => performFirmwareUpload(file, event.target),
+    });
+  };
+
+  const waitForDeviceReboot = async (): Promise<void> => {
+    return new Promise((resolve) => {
+      let countdown = 15; // 15 seconds
+      setIsRebooting(true);
+      setRebootCountdown(countdown);
+
+      const countdownInterval = setInterval(() => {
+        countdown--;
+        setRebootCountdown(countdown);
+        
+        if (countdown <= 0) {
+          clearInterval(countdownInterval);
+        }
+      }, 1000);
+
+      // Start checking if device is back online after 10 seconds
+      setTimeout(async () => {
+        let attempts = 0;
+        const maxAttempts = 20; // Try for 20 seconds
+        
+        const checkDeviceOnline = async (): Promise<boolean> => {
+          try {
+            await systemService.getSystemInfo();
+            return true;
+          } catch {
+            return false;
+          }
+        };
+
+        const pollDevice = setInterval(async () => {
+          attempts++;
+          const isOnline = await checkDeviceOnline();
+          
+          if (isOnline) {
+            clearInterval(pollDevice);
+            clearInterval(countdownInterval);
+            setIsRebooting(false);
+            resolve();
+          } else if (attempts >= maxAttempts) {
+            // Give up after max attempts
+            clearInterval(pollDevice);
+            clearInterval(countdownInterval);
+            setIsRebooting(false);
+            resolve();
+          }
+        }, 1000);
+      }, 10000); // Start polling after 10 seconds
     });
   };
 
@@ -299,24 +362,30 @@ export default function Settings() {
       );
 
       if (result.success) {
-        setActionMessage({ type: 'success', text: result.message });
-        
         // Clear file input and checksum state
         setFileChecksum('');
         setExpectedChecksum('');
+        input.value = '';
         
-        // Device will restart, so show message for a few seconds
-        setTimeout(() => {
-          window.location.reload();
-        }, 3000);
+        // Show rebooting message
+        setActionMessage({ 
+          type: 'success', 
+          text: '✅ Firmware uploaded successfully! Device is rebooting...' 
+        });
+        
+        // Wait for device to reboot and come back online
+        await waitForDeviceReboot();
+        
+        // Reload to show new firmware version
+        window.location.reload();
       } else {
         setActionMessage({ type: 'error', text: result.message || result.error || 'Firmware update failed' });
+        input.value = '';
       }
-
-      input.value = '';
     } catch (error) {
       setActionMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to upload firmware' });
       console.error(error);
+      input.value = '';
     } finally {
       setUploadingFirmware(false);
       setUploadProgress(null);
@@ -399,6 +468,45 @@ export default function Settings() {
       setActionMessage({ type: 'success', text: 'Configuration exported successfully' });
     } catch (error) {
       setActionMessage({ type: 'error', text: 'Failed to export configuration' });
+      console.error(error);
+    }
+  };
+
+  const handleImportConfig = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file extension
+    if (!file.name.endsWith('.json')) {
+      setActionMessage({ type: 'error', text: 'Please select a valid .json configuration file' });
+      event.target.value = '';
+      return;
+    }
+
+    // Show confirmation dialog
+    setConfirmDialog({
+      title: 'Import Configuration',
+      message: `Import configuration from "${file.name}"? This will update RTC and OLED settings. Device may need to restart for some changes to take effect.`,
+      onConfirm: () => performImportConfig(file, event.target),
+    });
+  };
+
+  const performImportConfig = async (file: File, input: HTMLInputElement) => {
+    try {
+      setActionMessage(null);
+      const result = await systemService.importConfig(file);
+      
+      if (result.success) {
+        setActionMessage({ type: 'success', text: result.message || 'Configuration imported successfully' });
+        // Reload hardware configs to reflect imported settings
+        await loadHardwareConfigs();
+      } else {
+        setActionMessage({ type: 'error', text: result.message || 'Failed to import configuration' });
+      }
+
+      input.value = '';
+    } catch (error) {
+      setActionMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to import configuration' });
       console.error(error);
     }
   };
@@ -518,11 +626,11 @@ export default function Settings() {
         </div>
       )}
 
-      <div className="max-w-7xl grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Product Info */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {/* System Information */}
         {systemInfo && (
           <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60">
-            <h2 className="text-lg font-medium mb-4">Product Information</h2>
+            <h2 className="text-lg font-medium mb-4">System Information</h2>
             
             <dl className="grid grid-cols-2 gap-3 text-sm">
               <dt className="text-gray-500">Product Name</dt>
@@ -539,16 +647,7 @@ export default function Settings() {
                 {systemInfo.buildDate}
                 {systemInfo.buildTime && ` ${systemInfo.buildTime}`}
               </dd>
-            </dl>
-          </div>
-        )}
 
-        {/* Hardware Info */}
-        {systemInfo && (
-          <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60">
-            <h2 className="text-lg font-medium mb-4">Hardware Information</h2>
-            
-            <dl className="grid grid-cols-2 gap-3 text-sm">
               <dt className="text-gray-500">Chip Model</dt>
               <dd>
                 {systemInfo.chipModel}
@@ -600,67 +699,69 @@ export default function Settings() {
                 )}
               </div>
 
-              {/* Timezone */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Timezone
-                </label>
-                <select
-                  value={rtcConfig.timezone}
-                  onChange={(e) => handleRTCConfigUpdate({ timezone: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                >
-                  {TIMEZONES.map((tz) => (
-                    <option key={tz.value} value={tz.value}>{tz.label}</option>
-                  ))}
-                </select>
+              {/* Timezone and Time Format */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Timezone
+                  </label>
+                  <select
+                    value={rtcConfig.timezone}
+                    onChange={(e) => handleRTCConfigUpdate({ timezone: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  >
+                    {TIMEZONES.map((tz) => (
+                      <option key={tz.value} value={tz.value}>{tz.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Time Format
+                  </label>
+                  <select
+                    value={rtcConfig.timeFormat}
+                    onChange={(e) => handleRTCConfigUpdate({ timeFormat: e.target.value as '12h' | '24h' })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  >
+                    <option value="12h">12-hour</option>
+                    <option value="24h">24-hour</option>
+                  </select>
+                </div>
               </div>
 
-              {/* Time Format */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Time Format
-                </label>
-                <select
-                  value={rtcConfig.timeFormat}
-                  onChange={(e) => handleRTCConfigUpdate({ timeFormat: e.target.value as '12h' | '24h' })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                >
-                  <option value="12h">12-hour</option>
-                  <option value="24h">24-hour</option>
-                </select>
-              </div>
+              {/* Date Format and Sync Priority */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Date Format
+                  </label>
+                  <select
+                    value={rtcConfig.dateFormat}
+                    onChange={(e) => handleRTCConfigUpdate({ dateFormat: e.target.value as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD' })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  >
+                    <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                    <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                    <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                  </select>
+                </div>
 
-              {/* Date Format */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Date Format
-                </label>
-                <select
-                  value={rtcConfig.dateFormat}
-                  onChange={(e) => handleRTCConfigUpdate({ dateFormat: e.target.value as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD' })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                >
-                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                </select>
-              </div>
-
-              {/* Sync Priority */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Time Sync Priority
-                </label>
-                <select
-                  value={rtcConfig.syncPriority}
-                  onChange={(e) => handleRTCConfigUpdate({ syncPriority: e.target.value as 'ntp' | 'rtc' | 'manual' })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                >
-                  <option value="ntp">NTP (Internet)</option>
-                  <option value="rtc">RTC Hardware</option>
-                  <option value="manual">Manual Only</option>
-                </select>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Time Sync Priority
+                  </label>
+                  <select
+                    value={rtcConfig.syncPriority}
+                    onChange={(e) => handleRTCConfigUpdate({ syncPriority: e.target.value as 'ntp' | 'rtc' | 'manual' })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  >
+                    <option value="ntp">NTP (Internet)</option>
+                    <option value="rtc">RTC Hardware</option>
+                    <option value="manual">Manual Only</option>
+                  </select>
+                </div>
               </div>
 
               {/* Action Buttons */}
@@ -708,106 +809,109 @@ export default function Settings() {
                 )}
               </div>
 
-              {/* Enable/Disable */}
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Enable Display
-                </label>
-                <button
-                  onClick={() => handleOLEDConfigUpdate({ enabled: !oledConfig.enabled })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    oledConfig.enabled ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'
-                  }`}
-                >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    oledConfig.enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`} />
-                </button>
+              {/* Enable Display and Screen Saver */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Enable Display
+                  </label>
+                  <button
+                    onClick={() => handleOLEDConfigUpdate({ enabled: !oledConfig.enabled })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      oledConfig.enabled ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      oledConfig.enabled ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Screen Saver
+                  </label>
+                  <button
+                    onClick={() => handleOLEDConfigUpdate({ screenSaver: !oledConfig.screenSaver })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      oledConfig.screenSaver ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      oledConfig.screenSaver ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
               </div>
 
-              {/* Brightness */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Brightness: {oledConfig.brightness}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="255"
-                  value={oledConfig.brightness}
-                  onChange={(e) => handleOLEDConfigUpdate({ brightness: parseInt(e.target.value) })}
-                  className="w-full"
-                />
+              {/* Brightness and Screen Timeout */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Brightness: {oledConfig.brightness}
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="255"
+                    value={oledConfig.brightness}
+                    onChange={(e) => handleOLEDConfigUpdate({ brightness: parseInt(e.target.value) })}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Screen Timeout
+                  </label>
+                  <select
+                    value={oledConfig.timeout}
+                    onChange={(e) => handleOLEDConfigUpdate({ timeout: e.target.value as OLEDScreenTimeout })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  >
+                    <option value="always-on">Always On</option>
+                    <option value="30s">30 seconds</option>
+                    <option value="1m">1 minute</option>
+                    <option value="5m">5 minutes</option>
+                    <option value="10m">10 minutes</option>
+                  </select>
+                </div>
               </div>
 
-              {/* Timeout */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Screen Timeout
-                </label>
-                <select
-                  value={oledConfig.timeout}
-                  onChange={(e) => handleOLEDConfigUpdate({ timeout: e.target.value as OLEDScreenTimeout })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                >
-                  <option value="always-on">Always On</option>
-                  <option value="30s">30 seconds</option>
-                  <option value="1m">1 minute</option>
-                  <option value="5m">5 minutes</option>
-                  <option value="10m">10 minutes</option>
-                </select>
-              </div>
+              {/* Rotation and Default Screen */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Rotation
+                  </label>
+                  <select
+                    value={oledConfig.rotation}
+                    onChange={(e) => handleOLEDConfigUpdate({ rotation: parseInt(e.target.value) as 0 | 90 | 180 | 270 })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  >
+                    <option value="0">0°</option>
+                    <option value="90">90°</option>
+                    <option value="180">180°</option>
+                    <option value="270">270°</option>
+                  </select>
+                </div>
 
-              {/* Rotation */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Rotation
-                </label>
-                <select
-                  value={oledConfig.rotation}
-                  onChange={(e) => handleOLEDConfigUpdate({ rotation: parseInt(e.target.value) as 0 | 90 | 180 | 270 })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                >
-                  <option value="0">0°</option>
-                  <option value="90">90°</option>
-                  <option value="180">180°</option>
-                  <option value="270">270°</option>
-                </select>
-              </div>
-
-              {/* Default Screen */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Default Screen
-                </label>
-                <select
-                  value={oledConfig.defaultScreen}
-                  onChange={(e) => handleOLEDConfigUpdate({ defaultScreen: e.target.value as OLEDDisplayMode })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                >
-                  <option value="clock">Clock</option>
-                  <option value="ip-address">IP Address</option>
-                  <option value="status">Status</option>
-                  <option value="sequence">Sequence</option>
-                  <option value="rotating">Rotating</option>
-                </select>
-              </div>
-
-              {/* Screen Saver */}
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Screen Saver
-                </label>
-                <button
-                  onClick={() => handleOLEDConfigUpdate({ screenSaver: !oledConfig.screenSaver })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    oledConfig.screenSaver ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'
-                  }`}
-                >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    oledConfig.screenSaver ? 'translate-x-6' : 'translate-x-1'
-                  }`} />
-                </button>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Default Screen
+                  </label>
+                  <select
+                    value={oledConfig.defaultScreen}
+                    onChange={(e) => handleOLEDConfigUpdate({ defaultScreen: e.target.value as OLEDDisplayMode })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  >
+                    <option value="clock">Clock</option>
+                    <option value="ip-address">IP Address</option>
+                    <option value="status">Status</option>
+                    <option value="sequence">Sequence</option>
+                    <option value="rotating">Rotating</option>
+                  </select>
+                </div>
               </div>
 
               {/* Test Display */}
@@ -820,6 +924,67 @@ export default function Settings() {
             </div>
           </div>
         )}
+
+        {/* Update Check Preferences */}
+        <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60">
+          <h2 className="text-lg font-medium mb-4">Automatic Update Check</h2>
+          
+          <div className="space-y-4">
+            {/* Enable/Disable Auto-Check */}
+            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Enable Automatic Update Checks
+                </label>
+                <p className="text-xs text-gray-500 mt-1">
+                  Automatically check for firmware updates when you open the app
+                </p>
+              </div>
+              <button
+                onClick={() => setAutoCheckEnabled(!autoCheckEnabled)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  autoCheckEnabled ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  autoCheckEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
+
+            {/* Check Interval */}
+            {autoCheckEnabled && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Check Frequency
+                </label>
+                <select
+                  value={checkInterval}
+                  onChange={(e) => setCheckInterval(parseInt(e.target.value))}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="1">Every hour</option>
+                  <option value="3">Every 3 hours</option>
+                  <option value="6">Every 6 hours</option>
+                  <option value="12">Every 12 hours</option>
+                  <option value="24">Once a day</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  How often to check for new firmware versions while the app is open
+                </p>
+              </div>
+            )}
+
+            {/* Info */}
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                ℹ️ {autoCheckEnabled 
+                  ? `The app will check for updates automatically every ${checkInterval} hour${checkInterval !== 1 ? 's' : ''} while open. You'll see a notification badge on the Settings icon and a toast notification when updates are available.`
+                  : 'Automatic update checks are disabled. You can manually check for updates using the button above.'}
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* Firmware Update & Manual Upload */}
         <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60">
@@ -886,7 +1051,7 @@ export default function Settings() {
                       </button>
 
                       {showAllVersions && (
-                        <div className="mt-2 space-y-2 max-h-64 overflow-y-auto">
+                        <div className="mt-2 space-y-2 max-h-64 overflow-y-auto scrollbar-thin">
                           {updateCheckResult.allVersions.map((version) => {
                             const badge = firmwareService.formatVersionBadge(
                               version,
@@ -1105,31 +1270,45 @@ export default function Settings() {
             <h2 className="text-lg font-medium mb-4">Firmware Backup & Recovery</h2>
             
             <div className="space-y-3">
-              <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+              <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-3">
+                {/* Current Version and Current Partition */}
                 <dl className="grid grid-cols-2 gap-3 text-sm">
-                  <dt className="text-gray-500">Current Version</dt>
-                  <dd className="font-medium">{otaStatus.currentVersion}</dd>
-                  
-                  <dt className="text-gray-500">Current Partition</dt>
-                  <dd className="font-mono text-xs">{otaStatus.currentPartition}</dd>
-                  
-                  {otaStatus.rollbackAvailable && (
-                    <>
+                  <div>
+                    <dt className="text-gray-500">Current Version</dt>
+                    <dd className="font-medium">{otaStatus.currentVersion}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-gray-500">Current Partition</dt>
+                    <dd className="font-mono text-xs">{otaStatus.currentPartition}</dd>
+                  </div>
+                </dl>
+                
+                {/* Backup Version and Backup Partition */}
+                {otaStatus.rollbackAvailable && (
+                  <dl className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
                       <dt className="text-gray-500">Backup Version</dt>
                       <dd className="font-medium text-blue-600 dark:text-blue-400">{otaStatus.backupVersion}</dd>
-                      
+                    </div>
+                    <div>
                       <dt className="text-gray-500">Backup Partition</dt>
                       <dd className="font-mono text-xs">{otaStatus.backupPartition}</dd>
-                    </>
-                  )}
-                  
-                  <dt className="text-gray-500">Boot Count</dt>
-                  <dd>{otaStatus.bootCount}</dd>
-                  
-                  <dt className="text-gray-500">Last Boot</dt>
-                  <dd className={otaStatus.lastBootSuccess ? 'text-green-600' : 'text-red-600'}>
-                    {otaStatus.lastBootSuccess ? '✓ Success' : '✗ Failed'}
-                  </dd>
+                    </div>
+                  </dl>
+                )}
+                
+                {/* Boot Count and Last Boot */}
+                <dl className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <dt className="text-gray-500">Boot Count</dt>
+                    <dd>{otaStatus.bootCount}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-gray-500">Last Boot</dt>
+                    <dd className={otaStatus.lastBootSuccess ? 'text-green-600' : 'text-red-600'}>
+                      {otaStatus.lastBootSuccess ? '✓ Success' : '✗ Failed'}
+                    </dd>
+                  </div>
                 </dl>
               </div>
 
@@ -1187,8 +1366,20 @@ export default function Settings() {
               onClick={handleExportConfig}
               className="w-full px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
             >
-              Export Configuration
+              📥 Export Configuration
             </button>
+
+            <label className="block">
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImportConfig}
+                className="hidden"
+              />
+              <div className="w-full px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors text-center cursor-pointer">
+                📤 Import Configuration
+              </div>
+            </label>
 
             <button
               onClick={handleClearLogs}
@@ -1213,11 +1404,48 @@ export default function Settings() {
           </div>
 
           <p className="mt-3 text-xs text-gray-500">
+            <strong>Note:</strong> Configuration files include RTC and OLED settings that can be backed up and restored.
+          </p>
+          <p className="mt-2 text-xs text-gray-500">
             <strong>Warning:</strong> Factory reset will erase all settings, WiFi credentials, and configurations. This action cannot be undone.
           </p>
         </div>
 
       </div>
+
+      {/* Reboot Status Overlay */}
+      {isRebooting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full p-8 border border-gray-200 dark:border-gray-800 text-center">
+            <div className="mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 mb-4">
+                <svg className="w-8 h-8 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">
+              🔄 Device Rebooting
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Installing firmware and restarting device...
+            </p>
+            {rebootCountdown > 0 ? (
+              <p className="text-sm text-gray-500">
+                Waiting for device to restart... ({rebootCountdown}s)
+              </p>
+            ) : (
+              <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                Checking if device is online...
+              </p>
+            )}
+            <div className="mt-4 w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-600 animate-pulse" style={{ width: '100%' }}></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation Dialog */}
       {confirmDialog && (

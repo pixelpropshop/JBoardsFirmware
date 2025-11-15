@@ -19,6 +19,9 @@ export interface SystemHealth {
   heapFree: number;
   heapUsed: number;
   heapMaxAlloc?: number;
+  psramTotal?: number;
+  psramFree?: number;
+  psramUsed?: number;
   cpuTemperature?: number;
   freeSketchSpace?: number;
   sketchSize?: number;
@@ -63,6 +66,16 @@ export interface FirmwareUpdateProgress {
   totalBytes?: number;
   timeRemaining?: number; // seconds
   message: string;
+}
+
+export interface RTCTime {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  timestamp: number;
 }
 
 export interface SystemActionResponse {

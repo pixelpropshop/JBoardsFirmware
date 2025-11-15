@@ -109,7 +109,17 @@ export const jboardService = {
   // Get this device info
   async getThisDevice(): Promise<ThisDevice> {
     try {
-      return await api.fetch<ThisDevice>('/api/jboard/status');
+      const data = await api.fetch<any>('/api/jboard/device');
+      // Map backend fields to frontend format
+      return {
+        mac: data.macAddress,
+        name: data.name,
+        type: data.deviceType,
+        capabilities: data.capabilities,
+        firmwareVersion: data.firmware,
+        ipAddress: data.ipAddress,
+        isListening: true,
+      };
     } catch {
       return mockThisDevice;
     }
@@ -118,7 +128,19 @@ export const jboardService = {
   // Get known peers
   async getPeers(): Promise<JBoardDevice[]> {
     try {
-      return await api.fetch<JBoardDevice[]>('/api/jboard/peers');
+      const data = await api.fetch<any[]>('/api/jboard/peers');
+      // Map backend fields to frontend format
+      return data.map(peer => ({
+        mac: peer.macAddress,
+        name: peer.name,
+        type: peer.deviceType,
+        capabilities: peer.capabilities,
+        rssi: peer.rssi,
+        lastSeen: new Date(peer.lastSeen).toISOString(), // Convert timestamp to ISO string
+        firmwareVersion: peer.firmware,
+        ipAddress: peer.ipAddress,
+        isPaired: true,
+      }));
     } catch {
       return mockPeers;
     }
@@ -127,9 +149,26 @@ export const jboardService = {
   // Start device discovery scan
   async startScan(): Promise<{ success: boolean; message?: string; devices?: JBoardDevice[] }> {
     try {
-      return await api.fetch<{ success: boolean; message?: string; devices?: JBoardDevice[] }>('/api/jboard/scan', {
+      const data = await api.fetch<any>('/api/jboard/scan', {
         method: 'POST',
       });
+      // Map backend device fields to frontend format
+      const devices = data.devices?.map((device: any) => ({
+        mac: device.macAddress,
+        name: device.name,
+        type: device.deviceType,
+        capabilities: device.capabilities,
+        rssi: device.rssi,
+        lastSeen: new Date().toISOString(),
+        firmwareVersion: device.firmware,
+        ipAddress: device.ipAddress,
+        isPaired: false,
+      })) || [];
+      return {
+        success: data.success,
+        message: data.message,
+        devices,
+      };
     } catch {
       console.log('Mock: Starting device scan');
       // Mock discovered devices (unpaired)
@@ -166,7 +205,7 @@ export const jboardService = {
     try {
       return await api.fetch<{ success: boolean; message?: string }>('/api/jboard/pair', {
         method: 'POST',
-        body: JSON.stringify({ mac, name }),
+        body: JSON.stringify({ macAddress: mac, name }),
       });
     } catch {
       console.log('Mock: Pairing with device:', mac);
@@ -177,9 +216,8 @@ export const jboardService = {
   // Unpair device
   async unpairDevice(mac: string): Promise<{ success: boolean; message?: string }> {
     try {
-      return await api.fetch<{ success: boolean; message?: string }>('/api/jboard/unpair', {
-        method: 'POST',
-        body: JSON.stringify({ mac }),
+      return await api.fetch<{ success: boolean; message?: string }>(`/api/jboard/peers/${mac}`, {
+        method: 'DELETE',
       });
     } catch {
       console.log('Mock: Unpairing device:', mac);
@@ -190,9 +228,9 @@ export const jboardService = {
   // Send message to peer
   async sendMessage(to: string, type: string, payload: any): Promise<{ success: boolean; message?: string }> {
     try {
-      return await api.fetch<{ success: boolean; message?: string }>('/api/jboard/send', {
+      return await api.fetch<{ success: boolean; message?: string }>('/api/jboard/message', {
         method: 'POST',
-        body: JSON.stringify({ to, type, payload }),
+        body: JSON.stringify({ to, command: type, data: payload }),
       });
     } catch {
       console.log('Mock: Sending message to', to, ':', type, payload);
@@ -205,7 +243,7 @@ export const jboardService = {
     try {
       return await api.fetch<{ success: boolean; message?: string }>('/api/jboard/broadcast', {
         method: 'POST',
-        body: JSON.stringify({ type, payload }),
+        body: JSON.stringify({ command: type, data: payload }),
       });
     } catch {
       console.log('Mock: Broadcasting:', type, payload);
@@ -216,7 +254,17 @@ export const jboardService = {
   // Get message history
   async getMessages(limit: number = 50): Promise<JBoardMessage[]> {
     try {
-      return await api.fetch<JBoardMessage[]>(`/api/jboard/messages?limit=${limit}`);
+      const data = await api.fetch<any[]>(`/api/jboard/messages?limit=${limit}`);
+      // Map backend message fields to frontend format
+      return data.map(msg => ({
+        id: msg.id,
+        from: msg.from,
+        to: '', // Backend doesn't track 'to' for received messages
+        timestamp: msg.receivedAt,
+        type: msg.command,
+        payload: typeof msg.data === 'string' ? JSON.parse(msg.data) : msg.data,
+        status: 'delivered',
+      }));
     } catch {
       return mockMessages;
     }

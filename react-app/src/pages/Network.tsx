@@ -58,9 +58,12 @@ export default function Network() {
   const [showAPAdvanced, setShowAPAdvanced] = useState(false);
   const [availableNetworks, setAvailableNetworks] = useState<ScanResult[]>([]);
   const [showNetworkList, setShowNetworkList] = useState(false);
-  const [resettingPortal, setResettingPortal] = useState(false);
   const [confirmDeleteProfile, setConfirmDeleteProfile] = useState<string | null>(null);
-  const [confirmResetPortal, setConfirmResetPortal] = useState(false);
+  const [showWiFiPassword, setShowWiFiPassword] = useState(false);
+  const [showAPPassword, setShowAPPassword] = useState(false);
+  const [waitingForReconnect, setWaitingForReconnect] = useState(false);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [updatingPriority, setUpdatingPriority] = useState(false);
 
   // Load initial configuration
   useEffect(() => {
@@ -82,7 +85,7 @@ export default function Network() {
       setAPConfig(ap);
       setNetworkStatus(status);
       setHostnameConfig(hostname);
-      setWiFiProfiles(profiles);
+      setWiFiProfiles(Array.isArray(profiles) ? profiles : []);
       setAutoReconnectConfig(autoReconnect);
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to load network configuration' });
@@ -91,19 +94,46 @@ export default function Network() {
     }
   };
 
-  // Auto-refresh network status every 10 seconds
+  // Auto-refresh network status (more frequently when waiting for reconnect)
   useEffect(() => {
+    const pollInterval = waitingForReconnect ? 2000 : 10000; // 2s when waiting, 10s normally
+    
     const interval = setInterval(async () => {
       try {
         const status = await networkService.getNetworkStatus();
         setNetworkStatus(status);
+        
+        // If waiting for reconnect and WiFi is now connected, reload page
+        if (waitingForReconnect && status.wifiConnected) {
+          setReconnectAttempts(prev => prev + 1);
+          
+          // Give it a moment to stabilize, then reload
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }
       } catch (error) {
         console.error('Failed to refresh network status:', error);
+        
+        // If waiting for reconnect, increment attempts
+        if (waitingForReconnect) {
+          setReconnectAttempts(prev => prev + 1);
+          
+          // After 30 attempts (60 seconds), stop waiting
+          if (reconnectAttempts >= 30) {
+            setWaitingForReconnect(false);
+            setReconnectAttempts(0);
+            setMessage({ 
+              type: 'error', 
+              text: 'Device did not reconnect. Please check your settings and refresh manually.' 
+            });
+          }
+        }
       }
-    }, 10000);
+    }, pollInterval);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [waitingForReconnect, reconnectAttempts]);
 
   const handleScanNetworks = async () => {
     setScanning(true);
@@ -148,8 +178,12 @@ export default function Network() {
       if (result.success) {
         setMessage({ 
           type: 'success', 
-          text: result.message || 'WiFi configuration saved. Device will reconnect...' 
+          text: 'WiFi configuration saved. Waiting for reconnection...' 
         });
+        
+        // Start monitoring for reconnection
+        setWaitingForReconnect(true);
+        setReconnectAttempts(0);
       } else {
         setMessage({ type: 'error', text: result.message || 'Failed to save WiFi configuration' });
       }
@@ -271,7 +305,7 @@ export default function Network() {
         setEditingProfile(null);
         // Reload profiles
         const profiles = await networkService.getWiFiProfiles();
-        setWiFiProfiles(profiles);
+        setWiFiProfiles(Array.isArray(profiles) ? profiles : []);
       } else {
         setMessage({ type: 'error', text: result.message || 'Failed to save WiFi profile' });
       }
@@ -291,7 +325,7 @@ export default function Network() {
         setMessage({ type: 'success', text: result.message || 'WiFi profile deleted successfully' });
         // Reload profiles
         const profiles = await networkService.getWiFiProfiles();
-        setWiFiProfiles(profiles);
+        setWiFiProfiles(Array.isArray(profiles) ? profiles : []);
       } else {
         setMessage({ type: 'error', text: result.message || 'Failed to delete WiFi profile' });
       }
@@ -314,23 +348,62 @@ export default function Network() {
   };
 
   const handleMovePriority = async (id: string, direction: 'up' | 'down') => {
-    const profile = wifiProfiles.find(p => p.id === id);
-    if (!profile) return;
+    if (updatingPriority) {
+      console.log('[handleMovePriority] Update already in progress, ignoring click');
+      return;
+    }
+    
+    setUpdatingPriority(true);
+    console.log(`[handleMovePriority] Called with id="${id}", direction="${direction}"`);
+    
+    // Sort profiles by priority to get their current order
+    const sortedProfiles = [...wifiProfiles].sort((a, b) => a.priority - b.priority);
+    console.log('[handleMovePriority] Sorted profiles:', sortedProfiles.map(p => ({ id: p.id, priority: p.priority })));
+    
+    // Find the current profile's position in the sorted array
+    const currentIndex = sortedProfiles.findIndex(p => p.id === id);
+    if (currentIndex === -1) {
+      console.error('[handleMovePriority] Profile not found:', id);
+      return;
+    }
+    
+    const currentProfile = sortedProfiles[currentIndex];
+    console.log(`[handleMovePriority] Current profile at index ${currentIndex}, priority ${currentProfile.priority}`);
 
-    const newPriority = direction === 'up' ? profile.priority - 1 : profile.priority + 1;
-    if (newPriority < 1 || newPriority > wifiProfiles.length) return;
+    // Calculate target index
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    console.log(`[handleMovePriority] Target index: ${targetIndex}`);
+    
+    // Check if target index is valid
+    if (targetIndex < 0 || targetIndex >= sortedProfiles.length) {
+      console.warn(`[handleMovePriority] Cannot move ${direction}, already at boundary`);
+      return;
+    }
+
+    // Get the profile we're swapping with
+    const targetProfile = sortedProfiles[targetIndex];
+    console.log(`[handleMovePriority] Swapping with profile at index ${targetIndex}, priority ${targetProfile.priority}`);
+
+    // Swap priorities: set current profile to target profile's priority
+    const newPriority = targetProfile.priority;
+    console.log(`[handleMovePriority] Setting profile "${id}" priority from ${currentProfile.priority} to ${newPriority}`);
 
     try {
       const result = await networkService.updateProfilePriority(id, newPriority);
       if (result.success) {
+        console.log('[handleMovePriority] Priority update successful, reloading profiles');
         // Reload profiles to get updated order
         const profiles = await networkService.getWiFiProfiles();
-        setWiFiProfiles(profiles);
+        setWiFiProfiles(Array.isArray(profiles) ? profiles : []);
       } else {
+        console.error('[handleMovePriority] Priority update failed:', result.message);
         setMessage({ type: 'error', text: result.message || 'Failed to update profile priority' });
       }
     } catch (error) {
+      console.error('[handleMovePriority] Exception:', error);
       setMessage({ type: 'error', text: 'Failed to update profile priority' });
+    } finally {
+      setUpdatingPriority(false);
     }
   };
 
@@ -353,29 +426,6 @@ export default function Network() {
       }
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to save auto-reconnect settings' });
-    }
-  };
-
-  // Captive Portal handlers
-  const handleResetCaptivePortal = () => {
-    setConfirmResetPortal(true);
-  };
-
-  const performResetCaptivePortal = async () => {
-    setResettingPortal(true);
-    setMessage(null);
-
-    try {
-      const result = await networkService.resetCaptivePortal();
-      if (result.success) {
-        setMessage({ type: 'success', text: result.message || 'Captive portal reset successfully. It will show on next AP connection.' });
-      } else {
-        setMessage({ type: 'error', text: result.message || 'Failed to reset captive portal' });
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to reset captive portal' });
-    } finally {
-      setResettingPortal(false);
     }
   };
 
@@ -490,13 +540,32 @@ export default function Network() {
             
             <div>
               <label className="block text-sm font-medium mb-1">Password</label>
-              <input 
-                type="password" 
-                value={wifiConfig.password}
-                onChange={(e) => setWifiConfig({ ...wifiConfig, password: e.target.value })}
-                placeholder="Leave empty to keep current"
-                className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900" 
-              />
+              <div className="relative">
+                <input 
+                  type={showWiFiPassword ? "text" : "password"}
+                  value={wifiConfig.password}
+                  onChange={(e) => setWifiConfig({ ...wifiConfig, password: e.target.value })}
+                  placeholder="Leave empty to keep current"
+                  className="w-full px-3 py-2 pr-10 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900" 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowWiFiPassword(!showWiFiPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                  title={showWiFiPassword ? "Hide password" : "Show password"}
+                >
+                  {showWiFiPassword ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             <Toggle
@@ -590,13 +659,32 @@ export default function Network() {
             
             <div>
               <label className="block text-sm font-medium mb-1">Password</label>
-              <input 
-                type="password" 
-                value={apConfig.password}
-                onChange={(e) => setAPConfig({ ...apConfig, password: e.target.value })}
-                placeholder="Leave empty to keep current"
-                className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900" 
-              />
+              <div className="relative">
+                <input 
+                  type={showAPPassword ? "text" : "password"}
+                  value={apConfig.password}
+                  onChange={(e) => setAPConfig({ ...apConfig, password: e.target.value })}
+                  placeholder="Leave empty to keep current"
+                  className="w-full px-3 py-2 pr-10 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900" 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAPPassword(!showAPPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                  title={showAPPassword ? "Hide password" : "Show password"}
+                >
+                  {showAPPassword ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mt-1">Minimum 8 characters</p>
             </div>
 
@@ -724,18 +812,18 @@ export default function Network() {
                   className="p-2 rounded border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-medium text-gray-500">#{profile.priority}</span>
-                        <h3 className="text-sm font-medium truncate">{profile.name}</h3>
-                      </div>
-                      <p className="text-xs text-gray-500 truncate">SSID: {profile.ssid}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-medium text-gray-500">#{profile.priority}</span>
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{profile.name}</h3>
                     </div>
+                    <p className="text-xs text-gray-500 truncate">SSID: {profile.ssid}</p>
+                  </div>
                     
                     <div className="flex gap-1 flex-shrink-0">
                       <button
                         onClick={() => handleMovePriority(profile.id, 'up')}
-                        disabled={index === 0}
+                        disabled={index === 0 || updatingPriority}
                         className="px-1.5 py-0.5 text-xs rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-30"
                         title="Move up"
                       >
@@ -743,7 +831,7 @@ export default function Network() {
                       </button>
                       <button
                         onClick={() => handleMovePriority(profile.id, 'down')}
-                        disabled={index === wifiProfiles.length - 1}
+                        disabled={index === wifiProfiles.length - 1 || updatingPriority}
                         className="px-1.5 py-0.5 text-xs rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-30"
                         title="Move down"
                       >
@@ -846,21 +934,6 @@ export default function Network() {
             </button>
           </div>
         </div>
-      </div>
-
-      {/* Captive Portal Reset Section */}
-      <div className="mt-4 rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60">
-        <h2 className="text-lg font-medium mb-2">Captive Portal</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Reset the initial setup wizard to show again when connecting to the Access Point.
-        </p>
-        <button
-          onClick={handleResetCaptivePortal}
-          disabled={resettingPortal}
-          className="px-4 py-2 rounded bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50"
-        >
-          {resettingPortal ? 'Resetting...' : 'Reset Captive Portal'}
-        </button>
       </div>
 
       {/* WiFi Profile Form Dialog */}
@@ -1062,19 +1135,6 @@ export default function Network() {
         ) : null;
       })()}
 
-      {/* Reset Captive Portal Confirmation Dialog */}
-      {confirmResetPortal && (
-        <ConfirmDialog
-          title="Reset Captive Portal"
-          message="Reset the captive portal? It will show again on the next connection to the Access Point."
-          onConfirm={() => {
-            performResetCaptivePortal();
-            setConfirmResetPortal(false);
-          }}
-          onCancel={() => setConfirmResetPortal(false)}
-          dangerous={false}
-        />
-      )}
     </div>
   );
 }

@@ -17,24 +17,36 @@ const GITHUB_RAW_BASE = `https://raw.githubusercontent.com/${GITHUB_REPO}/main`;
  */
 export const firmwareService = {
   /**
+   * Normalize board name for GitHub paths (convert to uppercase for consistency)
+   */
+  normalizeBoardName(boardName: string): string {
+    // Convert board name to uppercase and remove spaces
+    // e.g., "JSense Board" or "jboard-16" -> "JBOARD-16"
+    return boardName.toUpperCase().replace(/\s+BOARD$/, '').replace(/^JSENSE/, 'JBOARD-16');
+  },
+
+  /**
    * Get the GitHub URL for a board's manifest
    */
   getManifestUrl(boardName: string): string {
-    return `${GITHUB_RAW_BASE}/${boardName}/manifest.json`;
+    const normalizedName = this.normalizeBoardName(boardName);
+    return `${GITHUB_RAW_BASE}/${normalizedName}/manifest.json`;
   },
 
   /**
    * Get the GitHub URL for a board's versions manifest
    */
   getVersionsUrl(boardName: string): string {
-    return `${GITHUB_RAW_BASE}/${boardName}/versions.json`;
+    const normalizedName = this.normalizeBoardName(boardName);
+    return `${GITHUB_RAW_BASE}/${normalizedName}/versions.json`;
   },
 
   /**
    * Get the GitHub URL for a specific firmware file
    */
   getFirmwareUrl(boardName: string, version: string): string {
-    return `${GITHUB_RAW_BASE}/${boardName}/versions/${version}/firmware.bin`;
+    const normalizedName = this.normalizeBoardName(boardName);
+    return `${GITHUB_RAW_BASE}/${normalizedName}/versions/${version}/firmware.bin`;
   },
 
   /**

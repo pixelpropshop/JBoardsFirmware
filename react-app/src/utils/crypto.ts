@@ -1,9 +1,25 @@
 /**
+ * Check if Web Crypto API is available
+ * Note: crypto.subtle requires HTTPS (except on localhost)
+ */
+export function isCryptoAvailable(): boolean {
+  return typeof crypto !== 'undefined' && 
+         typeof crypto.subtle !== 'undefined' && 
+         typeof crypto.subtle.digest === 'function';
+}
+
+/**
  * Calculate SHA256 hash of a file
  * @param file File to hash
  * @returns Promise<string> Hex-encoded SHA256 hash
+ * @throws Error if Web Crypto API is not available
  */
 export async function calculateSHA256(file: File): Promise<string> {
+  // Check if Web Crypto API is available
+  if (!isCryptoAvailable()) {
+    throw new Error('Web Crypto API not available. HTTPS required for checksum verification.');
+  }
+  
   // Read file as ArrayBuffer
   const buffer = await file.arrayBuffer();
   

@@ -9,6 +9,7 @@
 
 // Forward declarations
 class SystemManager;
+class JBoardNetworkManager;
 
 // WiFi profile structure
 struct WiFiProfile {
@@ -79,6 +80,9 @@ public:
     // Safe Boot Mode support
     void setSystemManager(SystemManager* sysMgr);
     
+    // JBoard Network support
+    void setJBoardNetworkManager(JBoardNetworkManager* jboardMgr);
+    
 private:
     Preferences preferences;
     
@@ -102,6 +106,9 @@ private:
     
     // System manager reference for Safe Boot Mode
     SystemManager* systemManager;
+    
+    // JBoard network manager reference
+    JBoardNetworkManager* jboardNetworkManager;
     
     // Private methods
     void loadProfiles();

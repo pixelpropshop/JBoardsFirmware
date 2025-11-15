@@ -136,7 +136,7 @@ export default function Dashboard() {
 
             <div>
               <div className="flex items-center justify-between mb-1 text-sm">
-                <span className="text-gray-500">Memory Usage</span>
+                <span className="text-gray-500">Heap Memory (SRAM)</span>
                 <span className="font-medium">
                   {systemService.formatBytes(systemStats.health.heapUsed)} / {systemService.formatBytes(systemStats.health.heapTotal)}
                 </span>
@@ -156,6 +156,31 @@ export default function Dashboard() {
                 />
               </div>
             </div>
+
+            {systemStats.health.psramTotal && systemStats.health.psramTotal > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1 text-sm">
+                  <span className="text-gray-500">PSRAM</span>
+                  <span className="font-medium">
+                    {systemService.formatBytes(systemStats.health.psramUsed || 0)} / {systemService.formatBytes(systemStats.health.psramTotal)}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      ((systemStats.health.psramUsed || 0) / systemStats.health.psramTotal) > 0.8
+                        ? 'bg-red-600'
+                        : ((systemStats.health.psramUsed || 0) / systemStats.health.psramTotal) > 0.6
+                        ? 'bg-yellow-600'
+                        : 'bg-green-600'
+                    }`}
+                    style={{
+                      width: `${((systemStats.health.psramUsed || 0) / systemStats.health.psramTotal) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
 
             {systemStats.health.cpuTemperature && (
               <div>
@@ -179,10 +204,10 @@ export default function Dashboard() {
       </div>
 
       {/* LED Channels Card */}
-      <div className="col-span-1 rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60">
+      <div className="col-span-1 rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white/60 dark:bg-gray-950/60 flex flex-col">
         <h2 className="text-sm font-medium mb-3">LED Channels</h2>
         {systemStats ? (
-          <div className="space-y-2.5">
+          <div className="space-y-2.5 overflow-y-auto max-h-[400px] pr-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-gray-400 dark:[&::-webkit-scrollbar-thumb]:hover:bg-gray-500">
             {systemStats.ledChannels.map((channel) => (
               <div key={channel.id}>
                 <div className="flex items-center justify-between mb-1">

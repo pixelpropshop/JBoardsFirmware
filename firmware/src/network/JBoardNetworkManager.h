@@ -20,6 +20,10 @@ public:
     void begin();
     void update();
     
+    // Enable/Disable control
+    bool isEnabled();
+    void setEnabled(bool enabled);
+    
     // Device information
     JBoardDevice getThisDevice();
     void setDeviceName(const String& name);
@@ -54,6 +58,7 @@ private:
     std::vector<JBoardMessage> _receivedMessages;
     Preferences _prefs;
     bool _initialized;
+    bool _enabled;
     bool _scanning;
     unsigned long _scanStartTime;
     

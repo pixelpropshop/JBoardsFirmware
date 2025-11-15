@@ -1,6 +1,6 @@
 // Network API service with mock data fallback
 import { api } from './api';
-import type { WiFiConfig, APConfig, NetworkStatus, HostnameConfig, WiFiProfile, AutoReconnectConfig, CaptivePortalStatus, ScanResult } from '../types/network';
+import type { WiFiConfig, APConfig, NetworkStatus, HostnameConfig, WiFiProfile, AutoReconnectConfig, ScanResult } from '../types/network';
 
 // Mock data for development
 const mockWiFiConfig: WiFiConfig = {
@@ -68,13 +68,6 @@ const mockAutoReconnectConfig: AutoReconnectConfig = {
   maxAttempts: 5,
   attemptInterval: 30,
   fallbackToAP: true,
-};
-
-const mockCaptivePortalStatus: CaptivePortalStatus = {
-  isActive: false,
-  isCompleted: true,
-  apOnlyMode: false,
-  completedAt: new Date().toISOString(),
 };
 
 const mockScanResults: ScanResult[] = [
@@ -174,8 +167,24 @@ export const networkService = {
   // Get all WiFi profiles
   async getWiFiProfiles(): Promise<WiFiProfile[]> {
     try {
-      return await api.fetch<WiFiProfile[]>('/api/network/profiles');
-    } catch {
+      // Backend returns { profiles: [...] }
+      const response = await api.fetch<{ profiles: any[] }>('/api/network/profiles');
+      
+      // Transform backend format to frontend format
+      return response.profiles.map((p) => ({
+        id: p.ssid, // Use SSID as ID since backend doesn't provide one
+        name: p.name || p.ssid, // Use backend name field, fallback to SSID
+        ssid: p.ssid,
+        password: '', // Backend doesn't return passwords in profile list
+        ip: p.useStaticIP ? (p.staticIP || '') : '',
+        gateway: p.useStaticIP ? (p.gateway || '') : '',
+        subnet: p.useStaticIP ? (p.subnet || '') : '',
+        dns: '8.8.8.8', // Backend doesn't return DNS in profile list
+        dhcp: !p.useStaticIP, // Backend uses useStaticIP, frontend uses dhcp
+        priority: p.priority,
+      }));
+    } catch (error) {
+      console.error('Error fetching WiFi profiles:', error);
       return mockWiFiProfiles;
     }
   },
@@ -183,11 +192,37 @@ export const networkService = {
   // Save or update WiFi profile
   async saveWiFiProfile(profile: Omit<WiFiProfile, 'id'>): Promise<{ success: boolean; message?: string; id?: string }> {
     try {
-      return await api.fetch<{ success: boolean; message?: string; id?: string }>('/api/network/profiles', {
+      // Transform frontend format to backend format
+      const backendProfile: any = {
+        ssid: profile.ssid,
+        password: profile.password,
+        name: profile.name,
+        priority: profile.priority,
+        useStaticIP: !profile.dhcp, // Backend uses useStaticIP (true = static), frontend uses dhcp (true = DHCP)
+      };
+
+      // If using static IP, add nested staticIP object
+      if (!profile.dhcp) {
+        backendProfile.staticIP = {
+          ip: profile.ip,
+          gateway: profile.gateway,
+          subnet: profile.subnet,
+          dns1: profile.dns,
+          dns2: '8.8.4.4', // Secondary DNS
+        };
+      }
+
+      console.log('Saving WiFi profile with data:', backendProfile);
+      
+      const response = await api.fetch<{ success: boolean; message?: string; id?: string }>('/api/network/profiles', {
         method: 'POST',
-        body: JSON.stringify(profile),
+        body: JSON.stringify(backendProfile),
       });
-    } catch {
+      
+      console.log('WiFi profile save response:', response);
+      return response;
+    } catch (error) {
+      console.error('Error saving WiFi profile:', error);
       // Mock success response
       console.log('Mock: WiFi profile would be saved:', profile);
       return { success: true, message: 'WiFi profile saved (mock mode)', id: Date.now().toString() };
@@ -223,12 +258,20 @@ export const networkService = {
   // Update profile priority (for auto-connect order)
   async updateProfilePriority(id: string, priority: number): Promise<{ success: boolean; message?: string }> {
     try {
-      return await api.fetch<{ success: boolean; message?: string }>(`/api/network/profiles/${id}/priority`, {
+      console.log(`[NetworkService] Updating profile priority: SSID="${id}", new priority=${priority}`);
+      const url = `/api/network/profiles/priority`;
+      console.log(`[NetworkService] API URL: ${url}`);
+      
+      const response = await api.fetch<{ success: boolean; message?: string }>(url, {
         method: 'POST',
-        body: JSON.stringify({ priority }),
+        body: JSON.stringify({ ssid: id, priority }),
       });
-    } catch {
+      
+      console.log(`[NetworkService] Priority update response:`, response);
+      return response;
+    } catch (error) {
       // Mock success response
+      console.error('[NetworkService] Priority update failed:', error);
       console.log('Mock: Would update profile priority:', id, priority);
       return { success: true, message: 'Profile priority updated (mock mode)' };
     }
@@ -254,42 +297,6 @@ export const networkService = {
       // Mock success response
       console.log('Mock: Auto-reconnect config would be updated with:', config);
       return { success: true, message: 'Auto-reconnect configuration updated (mock mode)' };
-    }
-  },
-
-  // Get captive portal status
-  async getCaptivePortalStatus(): Promise<CaptivePortalStatus> {
-    try {
-      return await api.fetch<CaptivePortalStatus>('/api/captive/status');
-    } catch {
-      return mockCaptivePortalStatus;
-    }
-  },
-
-  // Complete captive portal setup
-  async completeCaptivePortal(apOnlyMode: boolean): Promise<{ success: boolean; message?: string }> {
-    try {
-      return await api.fetch<{ success: boolean; message?: string }>('/api/captive/complete', {
-        method: 'POST',
-        body: JSON.stringify({ apOnlyMode }),
-      });
-    } catch {
-      // Mock success response
-      console.log('Mock: Captive portal would be completed with AP-only mode:', apOnlyMode);
-      return { success: true, message: 'Captive portal setup completed (mock mode)' };
-    }
-  },
-
-  // Reset captive portal (show it again on next AP connection)
-  async resetCaptivePortal(): Promise<{ success: boolean; message?: string }> {
-    try {
-      return await api.fetch<{ success: boolean; message?: string }>('/api/captive/reset', {
-        method: 'POST',
-      });
-    } catch {
-      // Mock success response
-      console.log('Mock: Captive portal would be reset');
-      return { success: true, message: 'Captive portal reset (mock mode)' };
     }
   },
 };

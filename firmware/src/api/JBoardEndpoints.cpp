@@ -14,11 +14,64 @@ void setupJBoardEndpoints(AsyncWebServer& server, JBoardNetworkManager& jboardMa
         doc["deviceType"] = (uint8_t)device.deviceType;
         doc["capabilities"] = device.capabilities;
         doc["firmware"] = device.firmware;
+        doc["enabled"] = jboardManager.isEnabled();
         
         String response;
         serializeJson(doc, response);
         request->send(200, "application/json", response);
     });
+    
+    // GET /api/jboard/status - Get JBoard Network status
+    server.on("/api/jboard/status", HTTP_GET, [&jboardManager](AsyncWebServerRequest *request) {
+        StaticJsonDocument<512> doc;
+        doc["enabled"] = jboardManager.isEnabled();
+        doc["peerCount"] = jboardManager.getPeers().size();
+        
+        JBoardDevice device = jboardManager.getThisDevice();
+        doc["device"]["name"] = device.name;
+        doc["device"]["macAddress"] = device.macAddress;
+        doc["device"]["ipAddress"] = device.ipAddress;
+        
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    });
+    
+    // POST /api/jboard/network/enabled - Enable or disable JBoard Network
+    server.on("/api/jboard/network/enabled", HTTP_POST,
+        [](AsyncWebServerRequest *request) {
+            // Handle response in body handler
+        },
+        nullptr,
+        [&jboardManager](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            if (index + len == total) {
+                StaticJsonDocument<256> doc;
+                DeserializationError error = deserializeJson(doc, data, len);
+                
+                if (error) {
+                    request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+                    return;
+                }
+                
+                if (!doc.containsKey("enabled")) {
+                    request->send(400, "application/json", "{\"error\":\"Missing 'enabled' field\"}");
+                    return;
+                }
+                
+                bool enabled = doc["enabled"];
+                jboardManager.setEnabled(enabled);
+                
+                StaticJsonDocument<128> response;
+                response["success"] = true;
+                response["enabled"] = enabled;
+                response["message"] = enabled ? "JBoard Network enabled" : "JBoard Network disabled";
+                
+                String result;
+                serializeJson(response, result);
+                request->send(200, "application/json", result);
+            }
+        }
+    );
     
     // 2. GET /api/jboard/peers - Get connected peers
     server.on("/api/jboard/peers", HTTP_GET, [&jboardManager](AsyncWebServerRequest *request) {

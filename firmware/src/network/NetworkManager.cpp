@@ -1,6 +1,7 @@
 #include "NetworkManager.h"
 #include "../config.h"
 #include "../system/SystemManager.h"
+#include "JBoardNetworkManager.h"
 #include <nvs_flash.h>
 
 NetworkManager::NetworkManager() {
@@ -14,6 +15,7 @@ NetworkManager::NetworkManager() {
     currentHostname = DEFAULT_HOSTNAME;
     profileCount = 0;
     systemManager = nullptr;
+    jboardNetworkManager = nullptr;
 }
 
 void NetworkManager::begin() {
@@ -732,10 +734,11 @@ void NetworkManager::handleAutoReconnect() {
                 // Keep AP active if:
                 // 1. User has set keepActive preference
                 // 2. JBoard Network (ESP-NOW) is enabled (requires AP mode)
-                #if FEATURE_JBOARD_NETWORK
-                bool espNowActive = true;
-                #else
                 bool espNowActive = false;
+                #if FEATURE_JBOARD_NETWORK
+                if (jboardNetworkManager != nullptr) {
+                    espNowActive = jboardNetworkManager->isEnabled();
+                }
                 #endif
                 
                 if (!keepActive && !espNowActive) {
@@ -761,6 +764,10 @@ void NetworkManager::handleAutoReconnect() {
 
 void NetworkManager::setSystemManager(SystemManager* sysMgr) {
     systemManager = sysMgr;
+}
+
+void NetworkManager::setJBoardNetworkManager(JBoardNetworkManager* jboardMgr) {
+    jboardNetworkManager = jboardMgr;
 }
 
 // New WiFi Connection Strategy
