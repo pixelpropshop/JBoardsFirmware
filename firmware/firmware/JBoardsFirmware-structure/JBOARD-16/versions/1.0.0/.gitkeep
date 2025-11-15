@@ -1,0 +1,11 @@
+# Firmware binary placeholder
+# Place firmware.bin file here
+
+The firmware.bin file should be the compiled firmware binary from PlatformIO.
+
+To generate the firmware binary:
+1. Build the project in PlatformIO: `pio run -e jboard16`
+2. The firmware binary will be located at: `.pio/build/jboard16/firmware.bin`
+3. Copy the firmware binary to this directory
+4. Calculate SHA256 checksum: `sha256sum firmware.bin`
+5. Update the checksum in manifest.json and versions.json
