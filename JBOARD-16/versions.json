@@ -1,12 +1,21 @@
 {
   "versions": [
     {
+      "version": "1.0.9",
+      "buildDate": "2025-11-15",
+      "stable": true,
+      "changelog": "Version 1.0.9 - Test Release for OTA Validation\n- Same OTA validation fix as v1.0.8 (accepts ±512 bytes overhead)\n- Includes React app in filesystem image (10.54 MB combined package)\n- Testing GitHub OTA update system\n- All features from v1.0.8 included",
+      "checksum": "1FC381A70EABF4E08FDDCD9C466333E2AA7D8FC648B4F2B22731925AEBA531D3",
+      "fileSize": 11047264,
+      "minHardwareVersion": "1.0"
+    },
+    {
       "version": "1.0.8",
       "buildDate": "2025-11-15",
       "stable": true,
-      "changelog": "Version 1.0.8 - OTA Memory Fix\n- Fixed 500 error during OTA filesystem updates\n- Changed filesystem update to streaming writes instead of RAM buffering\n- Eliminated 2MB RAM allocation requirement\n- Direct partition writes for improved memory efficiency\n- All features from v1.0.7 included",
-      "checksum": "3641A9CB42B960D612F52DFD22BAD28ED2B60A10E72AD55FA234E60751ED3BC7",
-      "fileSize": 3181920,
+      "changelog": "Version 1.0.8 - OTA Validation Fix with React App\n- Fixed HTTP multipart boundary overhead causing OTA validation failures\n- Modified size validation to accept expected size ± 512 bytes\n- Includes React app in filesystem image (10.54 MB combined package)\n- All features from v1.0.7 included",
+      "checksum": "D9669379237840BEF581A318A39C6B706E0AEE950D98369E045FCF553876A99E",
+      "fileSize": 11047264,
       "minHardwareVersion": "1.0"
     },
     {
