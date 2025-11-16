@@ -1,6 +1,15 @@
 {
   "versions": [
     {
+      "version": "1.0.9",
+      "buildDate": "2025-11-15",
+      "stable": true,
+      "changelog": "Version 1.0.9 - Test Release for OTA Validation\n- Same OTA validation fix as v1.0.8 (accepts ±512 bytes overhead)\n- Includes React app in filesystem image (10.54 MB combined package)\n- Testing GitHub OTA update system\n- All features from v1.0.8 included",
+      "checksum": "1FC381A70EABF4E08FDDCD9C466333E2AA7D8FC648B4F2B22731925AEBA531D3",
+      "fileSize": 11047264,
+      "minHardwareVersion": "1.0"
+    },
+    {
       "version": "1.0.8",
       "buildDate": "2025-11-15",
       "stable": true,
