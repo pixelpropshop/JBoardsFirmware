@@ -1,6 +1,15 @@
 {
   "versions": [
     {
+      "version": "1.0.7",
+      "buildDate": "2025-11-15",
+      "stable": true,
+      "changelog": "Version 1.0.7 - Combined OTA Update System\n- Implemented combined OTA packages (firmware + filesystem in single update)\n- Auto-detects combined vs legacy firmware packages\n- SHA-256 verification for both firmware and filesystem components\n- Disabled safe boot crash detection for development\n- Expanded NVS partition from 20KB to 200KB for future-proofing\n- Optimized OTA package size with 2MB filesystem (vs 10MB full partition)\n- Changed branding from 'JSense Board' to 'JBoards'\n- Backward compatible with legacy firmware.bin updates\n- Improved update reliability and progress reporting\n- All features from v1.0.6 included",
+      "checksum": "4D40AADB0E4B4EABD7F3E3FBBF3307E031C5B728A9A14A0FEB79C2C7C95655FF",
+      "fileSize": 3182096,
+      "minHardwareVersion": "1.0"
+    },
+    {
       "version": "1.0.6",
       "buildDate": "2025-11-14",
       "stable": true,
