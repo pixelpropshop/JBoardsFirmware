@@ -1,6 +1,16 @@
 {
   "versions": [
     {
+      "version": "1.2.2",
+      "buildDate": "2026-07-10",
+      "stable": true,
+      "changelog": "Version 1.2.2 - Update Result Reporting Fix\n- Successful updates no longer report as failures: the device previously rebooted before its success response could reach the browser, so every successful update (and restart, and rollback) looked like a connection error. Restarts are now scheduled so the response is delivered first.\n- The update page now double-checks after a dropped connection: it waits out the reboot and confirms the running firmware version, so an update that applied is reported as the success it was (also covers updating FROM older firmware, which still drops the connection one last time).",
+      "checksum": "BC40159EF3F108ADF17CAB05D9298862F870AF8099B1931A7BD38394F0170BD1",
+      "fileSize": 6156944,
+      "minHardwareVersion": "1.0",
+      "sourceCommit": "1773b7c"
+    },
+    {
       "version": "1.2.1",
       "buildDate": "2026-07-10",
       "stable": true,
