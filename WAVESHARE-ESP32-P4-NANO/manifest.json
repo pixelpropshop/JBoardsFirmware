@@ -1,0 +1,9 @@
+{
+  "latestVersion": "1.2.0",
+  "latestUrl": "https://raw.githubusercontent.com/pixelpropshop/JBoardsFirmware/main/WAVESHARE-ESP32-P4-NANO/versions/1.2.0/firmware.bin",
+  "checksum": "3B3D171F9AC625820654A21591415D66D9A833D753D8509E3B273F0AF9DB0724",
+  "updateType": "combined",
+  "firmwareSize": 3007952,
+  "filesystemSize": 3145728,
+  "totalSize": 6154192
+}

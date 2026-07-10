@@ -1,0 +1,13 @@
+{
+  "versions": [
+    {
+      "version": "1.2.0",
+      "buildDate": "2026-07-09",
+      "stable": true,
+      "changelog": "Version 1.2.0 - First release for the Waveshare ESP32-P4 Nano profile\n- First GitHub-published release for this board variant (Combined OTA updates now functional)\n- Fixed Combined OTA filesystem updates: partition lookup used the wrong label and would always fail to find the web app partition\n- Fixed Combined OTA filesystem erase blocking long enough to trip the task watchdog mid-update, corrupting LittleFS and wiping the web app - erase is now chunked with periodic watchdog resets\n- Fixed pre-OTA backup silently failing to write (missing /backups directory)\n- Removed channel merge mode (LTP/HTP): simplified to always-overwrite, since this project doesn't have multiple independent sources contending for the same channels\n- Generalized P4-specific Ethernet naming (P4_ETH_* / p4-ethernet) to chip-agnostic RMII naming, since the same code already supports both IP101 and KSZ8863 hardware\n- Fixed a crash in the Settings Diagnostics panel caused by a warnings API response shape mismatch\n- Fixed a full SD card scan needlessly caching unrelated files (e.g. camera photos) on every request, wasting heap\n- Fixed a Sensors page crash/freeze (React Query enabled-flag type mismatch) that made navigation unresponsive\n- Sensors page: system toggle now defaults off when no sensors are configured\n- Dashboard: added a sensor system status badge (Active/Disabled/No Sensors) to the Sensors & Automations card\n- Effects page: reworked layout so Power/Brightness aligns with the effects grid and the settings panel uses the full column height\n- Reordered Scheduling after Playlists in the navigation menu",
+      "checksum": "3B3D171F9AC625820654A21591415D66D9A833D753D8509E3B273F0AF9DB0724",
+      "fileSize": 6154192,
+      "minHardwareVersion": "1.0"
+    }
+  ]
+}
