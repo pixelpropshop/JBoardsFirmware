@@ -1,0 +1,15 @@
+{
+  "schema": 2,
+  "channel": "stable",
+  "boards": {
+    "UNIVERSAL": {
+      "version": "0.0.2",
+      "url": "https://github.com/pixelpropshop/JBoardsFirmware/releases/download/pb2-v0.0.2/jbd-0.0.2.jbdpkg",
+      "sha256": "2FD56C59ED6DA378A199B37D738AAC765186A684816A914C8DB360D8BB788098",
+      "size": 2171744,
+      "releaseDate": "2026-07-28",
+      "changelog": "Version 0.0.2 \u2014 the first update this board can actually find\n\nUntil now the device updater had nothing to check. It fetches a per-platform\nmanifest from the public distribution repo, but the release workflow only ever\nattached a package to a GitHub release and never wrote that manifest, so every\nupdate check failed. This release ships the missing publisher, and the manifest\nnow exists.\n\nIntegrity is checked against the manifest rather than against the package's own\nmetadata. A checksum stored inside an archive cannot attest to the archive that\ncontains it, which is why the in-package checksum field has always been empty\nand the package's self-verification always passed. The manifest's SHA-256 lives\noutside the artifact and is verified against the downloaded bytes before\nanything is installed.\n\nAlso in this build:\n- Streaming receive matches the ESP32 on every decode rule: preview-flagged\n  E1.31 frames are never displayed, a terminating sender releases the outputs\n  immediately, the DDP all-devices destination id is accepted, storage-flagged\n  packets are not displayed, unsupported pixel formats are refused, and RGBW\n  payloads pass through untouched so RGBW strips render correctly. The three\n  protocol decoders are now literally the same code on both boards.\n- DDP status and config queries are answered, so DDP-native discovery finds\n  this board.\n- Frame output waits for a complete frame instead of flipping mid-burst, so a\n  slow multi-universe sender no longer shows half of one frame with half of the\n  next.\n- Pixel sources are arbitrated by priority rather than last-writer-wins: a\n  running show is no longer stomped frame-by-frame by an effect or a sensor\n  automation, and a source that stops writing stops owning the output.\n- DMX channel mappings read from the correct source channels when universes are\n  not 512 channels wide.\n- Sunrise and sunset use the full NOAA solar algorithm, matching the ESP32\n  minute for minute.\n- Every thread the daemon runs now has a name, so `top -H` and crash reports\n  are readable."
+    }
+  },
+  "updated": "2026-07-28T07:41:50Z"
+}
