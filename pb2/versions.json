@@ -2,7 +2,17 @@
   "schema": 2,
   "boards": {
     "UNIVERSAL": {
-      "versions": []
+      "versions": [
+        {
+          "version": "0.0.4",
+          "buildDate": "2026-07-28",
+          "stable": true,
+          "changelog": "Version 0.0.4 \u2014 one version number for both boards\n\nBoth JBoards firmwares now carry the same version number and ship as one\nrelease. Until now the ESP32-P4 and the PocketBeagle 2 were numbered\nindependently and published as separate entries, so the same product could be\n0.0.3 on one board and 0.0.108 on the other, and finding the right download\nmeant knowing which entry belonged to which board. A version is now a single\nrelease holding both boards' files, and \"what version are you on?\" has one\nanswer.\n\nThe PocketBeagle 2 numbering restarts to match. Boards running one of the old\n0.0.10x builds will not be offered this release automatically, because it is a\nlower number; those boards need updating once by hand, after which normal update\nchecks resume.\n\nDownloads are named the same way on both boards, firmware-<board>-<version>, so\nthe file you are downloading names the board it is for.",
+          "url": "https://github.com/pixelpropshop/JBoardsFirmware/releases/download/v0.0.4/firmware-POCKETBEAGLE-2-0.0.4.jbdpkg",
+          "sha256": "6CB949B5920F3EEE08009E9A3D28779096F3DAE2B86C4F7B77898E7F6B4FDCA7",
+          "size": 2274740
+        }
+      ]
     }
   }
 }
