@@ -4,6 +4,16 @@
     "WAVESHARE-ESP32-P4-NANO": {
       "versions": [
         {
+          "version": "0.0.3",
+          "buildDate": "2026-07-28",
+          "stable": true,
+          "changelog": "Version 0.0.3 \u2014 fleet updates report what a board is really running\n\nUpdating another board from the fleet tools could report success without the\nboard having restarted. The restart request was sent in a form the PocketBeagle\nfirmware rejects, and that failure was ignored on purpose because a real restart\ndrops the connection. Verification then checked the version installed on the\nboard's disk rather than the version it was executing \u2014 and installing already\nsets that \u2014 so the update announced itself as verified and running while the\nboard carried on with the previous firmware.\n\nBoth boards are now verified the same way: by asking what version is running,\nafter a restart that is actually requested. An update that cannot be seen\nrunning is reported as a failure instead of a success.\n\nESP32-P4 boards were never affected by the false report \u2014 their updates reboot\nthemselves and were already verified against the running image.",
+          "url": "https://github.com/pixelpropshop/JBoardsFirmware/releases/download/esp32-v0.0.3/firmware-WAVESHARE-ESP32-P4-NANO-0.0.3.bin",
+          "sha256": "2384BF2E9174390D2DEA3567BC79CE29D01C638AD874AF4ECB8EB5A45B6D26BE",
+          "size": 8876528,
+          "sourceCommit": "f870f28"
+        },
+        {
           "version": "0.0.2",
           "buildDate": "2026-07-28",
           "stable": true,
