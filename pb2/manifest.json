@@ -3,13 +3,13 @@
   "channel": "stable",
   "boards": {
     "UNIVERSAL": {
-      "version": "0.0.106",
-      "url": "https://github.com/pixelpropshop/JBoardsFirmware/releases/download/pb2-v0.0.106/jbd-0.0.106.jbdpkg",
-      "sha256": "A79CA10EFCE3C036F916B5DFB8D0520E7292AF3A7BAC82AAA610A95FCDF444E5",
-      "size": 2303480,
+      "version": "0.0.107",
+      "url": "https://github.com/pixelpropshop/JBoardsFirmware/releases/download/pb2-v0.0.107/jbd-0.0.107.jbdpkg",
+      "sha256": "7DADEF1D0DAA5A67A81CDE8C27DCF0B32A85EB3E2E3878F205E1E4FFC1A9ED97",
+      "size": 2303152,
       "releaseDate": "2026-07-28",
-      "changelog": "Version 0.0.106 \u2014 updating no longer breaks the pixel output\n\nAn update installed its PRU firmware into the wrong directory. The package\ncarries the build layout, the board reads a slightly different one, and the OS\ninstaller has always translated between them \u2014 the in-place updater did not. It\nalso cleared the whole firmware directory before copying, removing files the\npackage cannot put back. The board kept running normally because an update does\nnot restart the daemon, so nothing noticed until the next restart, at which\npoint the pixel driver could not find its firmware and the service failed to\nstart. Updating now places each file where the board expects it and only\nreplaces what the package actually supplies. This is the first release that has\nbeen installed and then restarted end to end.\n\nThe firmware version shown around the UI was the build tag, not the version\ninstalled. On a board that had ever been updated the two were different, so the\nSystem page, the board identity other JBoards see on the network, the version\nreported to FPP and xLights, the front-panel display and the stored system\nconfiguration all kept naming the original factory build while the update card\ncorrectly showed the installed one. They now all report the running version.\n\nThe update status also distinguishes what is installed from what is running.\nInstalling a package does not activate it \u2014 a restart does \u2014 and until now\nnothing said so, which made an update whose restart never happened look\nfinished. The status now reports the running version alongside the installed one\nand flags that a restart is pending."
+      "changelog": "Version 0.0.107 \u2014 rolling back to the previous version now works\n\nRolling back has never worked, in either form: the button on the Settings page\nand the automatic restore that is supposed to undo a failed update. Restoring\nthe backup tried to write over the program that was running at that moment,\nwhich the system refuses, and the failure was then reported as \"no backup\navailable\" \u2014 pointing at the one thing that was not wrong, while the backup sat\nthere intact. The restore now replaces the program the same way an update does,\nand a failed rollback says what actually went wrong.\n\nRolling back also restores the pixel driver firmware, not just the program and\nthe web UI. A bad or misplaced driver payload is one of the likeliest reasons a\nboard would fail to start after an update, and restoring everything except that\nwould have left the board exactly as stuck as before.\n\nRolling back twice no longer loses track of the version. The restored version is\nnow read from the backup itself rather than inferred, so the board reports the\nversion it actually restored instead of \"unknown\"."
     }
   },
-  "updated": "2026-07-28T09:30:08Z"
+  "updated": "2026-07-28T09:46:27Z"
 }
