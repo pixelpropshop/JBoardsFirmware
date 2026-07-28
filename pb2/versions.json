@@ -4,6 +4,15 @@
     "UNIVERSAL": {
       "versions": [
         {
+          "version": "0.0.106",
+          "buildDate": "2026-07-28",
+          "stable": true,
+          "changelog": "Version 0.0.106 \u2014 updating no longer breaks the pixel output\n\nAn update installed its PRU firmware into the wrong directory. The package\ncarries the build layout, the board reads a slightly different one, and the OS\ninstaller has always translated between them \u2014 the in-place updater did not. It\nalso cleared the whole firmware directory before copying, removing files the\npackage cannot put back. The board kept running normally because an update does\nnot restart the daemon, so nothing noticed until the next restart, at which\npoint the pixel driver could not find its firmware and the service failed to\nstart. Updating now places each file where the board expects it and only\nreplaces what the package actually supplies. This is the first release that has\nbeen installed and then restarted end to end.\n\nThe firmware version shown around the UI was the build tag, not the version\ninstalled. On a board that had ever been updated the two were different, so the\nSystem page, the board identity other JBoards see on the network, the version\nreported to FPP and xLights, the front-panel display and the stored system\nconfiguration all kept naming the original factory build while the update card\ncorrectly showed the installed one. They now all report the running version.\n\nThe update status also distinguishes what is installed from what is running.\nInstalling a package does not activate it \u2014 a restart does \u2014 and until now\nnothing said so, which made an update whose restart never happened look\nfinished. The status now reports the running version alongside the installed one\nand flags that a restart is pending.",
+          "url": "https://github.com/pixelpropshop/JBoardsFirmware/releases/download/pb2-v0.0.106/jbd-0.0.106.jbdpkg",
+          "sha256": "A79CA10EFCE3C036F916B5DFB8D0520E7292AF3A7BAC82AAA610A95FCDF444E5",
+          "size": 2303480
+        },
+        {
           "version": "0.0.105",
           "buildDate": "2026-07-28",
           "stable": true,
