@@ -4,6 +4,15 @@
     "UNIVERSAL": {
       "versions": [
         {
+          "version": "0.0.108",
+          "buildDate": "2026-07-28",
+          "stable": true,
+          "changelog": "Version 0.0.108 \u2014 updates that fail are caught, and uptime means something\n\nAn update is no longer treated as proven the moment it finishes starting. The\nboard now waits until the new version has been running for two minutes before it\nstands down the rollback protection, so a version that starts cleanly and then\ndies is still rolled back \u2014 which is the case the protection exists for. It also\nrefuses to stand down while an update is installed but not yet running, so the\nprotection is not spent on the version being replaced.\n\nA board whose pixel driver firmware was left in the wrong place by an older\nupdate now repairs itself at startup instead of refusing to start. That fault\ncould not be fixed by updating again, because the update that misplaced the\nfiles was the one already installed.\n\nUptime is the daemon's own, everywhere it is reported. The status pages counted\nfrom the first time anything asked rather than from startup, so a board running\nfor a week reported no uptime to whoever looked first \u2014 and the uptime announced\nto other JBoards was the machine's, which does not change when the board's\nsoftware restarts. Both now report how long this board's software has actually\nbeen running, which is what tells you whether it restarted.\n\nFleet updates verify what a board is running rather than what was copied onto\nit, and send a restart request in the form the board accepts. Together these\nmade an update of another board report success while that board carried on\nrunning its previous version.",
+          "url": "https://github.com/pixelpropshop/JBoardsFirmware/releases/download/pb2-v0.0.108/jbd-0.0.108.jbdpkg",
+          "sha256": "E3EB1879318B5602924AD19B9091D2A1F24A991E622E4449EE9315C3CCA83BA4",
+          "size": 2274720
+        },
+        {
           "version": "0.0.107",
           "buildDate": "2026-07-28",
           "stable": true,
