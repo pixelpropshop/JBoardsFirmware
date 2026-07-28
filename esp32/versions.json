@@ -4,6 +4,16 @@
     "WAVESHARE-ESP32-P4-NANO": {
       "versions": [
         {
+          "version": "0.0.2",
+          "buildDate": "2026-07-28",
+          "stable": true,
+          "changelog": "Version 0.0.2 \u2014 proves the update path end to end\n\nStill a bench pre-release; 1.0.0 remains reserved for the first build meant for\ngeneral use.\n\n0.0.1 was the first release published through the new distribution system, and\npublishing it surfaced a defect worth naming: the firmware image was uploaded\nunder its local build filename while the manifest pointed at the intended\nrelease filename, so a board that checked for an update fetched a valid\nmanifest and then got a 404 on the image itself. The publisher now names the\nasset correctly, and asset reachability is checked as part of releasing rather\nthan assumed.\n\n0.0.2 exists to exercise what 0.0.1 could not: an actual download, install and\nreboot driven by the manifest, on a board that starts on a different version.\n\nAlso in this build:\n- Streaming diagnostics no longer report protocol-valid packets that were\n  deliberately not displayed (preview frames, packets for unconfigured\n  universes, packets suppressed by source arbitration) as if they had been\n  received.\n- The device log ring is in PSRAM, so a log bundle covers the whole boot rather\n  than the last few dozen lines.\n- Rate limiting on the update and upload endpoints keys on the full client\n  address. On a network wider than a /24 two different clients could previously\n  share a bucket, so one client retrying could throttle another.",
+          "url": "https://github.com/pixelpropshop/JBoardsFirmware/releases/download/esp32-v0.0.2/firmware-WAVESHARE-ESP32-P4-NANO-0.0.2.bin",
+          "sha256": "B1B58CF43DEAA0E19F644E34ABE409182D42F89412965CECBBF4D23C44AAD8D6",
+          "size": 8876528,
+          "sourceCommit": "22c5a06"
+        },
+        {
           "version": "0.0.1",
           "buildDate": "2026-07-28",
           "stable": true,
