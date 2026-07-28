@@ -1,0 +1,17 @@
+{
+  "schema": 2,
+  "channel": "stable",
+  "boards": {
+    "WAVESHARE-ESP32-P4-NANO": {
+      "version": "0.0.1",
+      "url": "https://github.com/pixelpropshop/JBoardsFirmware/releases/download/esp32-v0.0.1/firmware-WAVESHARE-ESP32-P4-NANO-0.0.1.bin",
+      "sha256": "2E3A888F39C48C06FBCE2A37D68CBE5779730497E509A6A3C1092D68926CAC4F",
+      "size": 8876512,
+      "updateType": "combined",
+      "firmwareSize": 3633120,
+      "filesystemSize": 5242880,
+      "releaseDate": "2026-07-28"
+    }
+  },
+  "updated": "2026-07-28T07:08:50Z"
+}

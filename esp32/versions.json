@@ -1,0 +1,19 @@
+{
+  "schema": 2,
+  "boards": {
+    "WAVESHARE-ESP32-P4-NANO": {
+      "versions": [
+        {
+          "version": "0.0.1",
+          "buildDate": "2026-07-28",
+          "stable": true,
+          "changelog": "Version 0.0.1 \u2014 first release published through the new distribution system\n\nThis is a pre-release build for bench testing. Version numbers stay in the\n0.0.x range until the firmware is meant for general use, at which point it\nbecomes 1.0.0.\n\nThe update mechanism itself changed: releases are now published per platform\nwith the firmware image served as a release asset, and the board verifies the\npackage's SHA-256 against the manifest before it swaps boot partitions. Large\nupdates transfer in resumable chunks, so a dropped connection costs one chunk\nrather than the whole download.\n\nStreaming receive\n- E1.31 preview-flagged packets no longer drive live output, and a sender that\n  terminates its stream releases the outputs immediately instead of holding the\n  last frame until the silence timeout expires.\n- DDP: the all-devices destination id is accepted, storage-flagged packets are\n  no longer displayed, unsupported pixel formats are refused rather than\n  painted as garbage, and RGBW payloads pass through untouched so RGBW strips\n  render correctly.\n- Universe layouts honour a configurable channels-per-universe, so xLights'\n  510-channel universes land on the channels the sequence expects.\n- Optional per-sender arbitration: the highest-priority source owns a universe\n  until it goes quiet, matching FPP's behaviour.\n\nEffects, looks and routines\n- Saved effects and layer stacks are now one concept, a Look: a saved\n  composition of one or more layers.\n- Looks arranged over time are an Effect Routine, edited on a sequential\n  timeline where order is time. Transitions between steps render as real\n  cross-fades.\n- \"Sequence\" now means an FSEQ frame file, matching what xLights and FPP mean\n  by the word.\n\nDiagnostics\n- The device log is now populated and readable from the web UI, so a\n  misbehaving board can be diagnosed from a log bundle instead of a serial\n  cable. The log view says so when the log it is showing is incomplete.\n\nScheduling and sensors\n- Sunrise and sunset use the full NOAA solar algorithm. This fixes locations\n  east of roughly +90 degrees longitude, which previously fell back to a fixed\n  06:00/18:00 schedule year round.\n- Sensor calibration accepts a two-point scale-and-offset model, with a\n  reference-value solve for single-point correction.\n\nFleet\n- A live fleet page with per-board health, delivery reporting, and update\n  status across every board on the network.\n\nPixel output\n- An output with no streaming channel assignment is no longer blanked every\n  frame; new outputs are created with a usable channel assignment by default.\n- A source that stops writing stops owning the pixels, so a stalled sender can\n  no longer lock out effects or playback until reboot.",
+          "url": "https://github.com/pixelpropshop/JBoardsFirmware/releases/download/esp32-v0.0.1/firmware-WAVESHARE-ESP32-P4-NANO-0.0.1.bin",
+          "sha256": "2E3A888F39C48C06FBCE2A37D68CBE5779730497E509A6A3C1092D68926CAC4F",
+          "size": 8876512,
+          "sourceCommit": "18dd2ed"
+        }
+      ]
+    }
+  }
+}
