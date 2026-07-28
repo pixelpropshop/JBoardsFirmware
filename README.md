@@ -1,268 +1,85 @@
-# JBoards Firmware Repository Structure
+# JBoards firmware distribution
 
-This directory contains the structure for the JBoardsFirmware GitHub repository that hosts firmware updates for all JBoard variants.
+Public on purpose: boards and browsers fetch from here unauthenticated while the
+firmware sources stay private. Nothing here is edited by hand — it is written by
+`tools/release.py` in the firmware repo, and the manifest is the pointer that
+makes a version live.
 
-## Repository Structure
-
-The firmware repository should be organized as follows:
+## Layout
 
 ```
-JBoardsFirmware/
-├── README.md
-├── JBOARD-2/
-│   ├── manifest.json
-│   ├── versions.json
-│   └── versions/
-│       ├── 1.0.0/
-│       │   └── firmware.bin
-│       └── 1.0.1/
-│           └── firmware.bin
-├── JBOARD-4/
-│   ├── manifest.json
-│   ├── versions.json
-│   └── versions/
-│       └── ...
-├── JBOARD-8/
-│   ├── manifest.json
-│   ├── versions.json
-│   └── versions/
-│       └── ...
-└── JBOARD-16/
-    ├── manifest.json
-    ├── versions.json
-    └── versions/
-        └── 1.0.0/
-            └── firmware.bin
+esp32/
+  manifest.json     "what is current" — one entry per board
+  versions.json     version history + changelogs
+pb2/
+  manifest.json     same shape, PocketBeagle 2 firmware
+  versions.json
 ```
 
-## File Descriptions
+One directory per **platform**, not per board: a single manifest carries every
+board of that platform, keyed by board name. Release tags are platform-prefixed
+(`esp32-v0.0.1`) so ESP32 and PB2 releases never collide and nothing has to
+consult the repo-global `/releases/latest`.
 
-### manifest.json
+**Binaries are GitHub Release assets, never committed here.** Each combined
+image is ~8.5 MB; committing them would make every clone carry every image ever
+shipped, forever. The manifest holds absolute asset URLs instead.
 
-Contains information about the latest stable firmware version. This is the primary file checked by devices for updates.
+## Who reads what
 
-**Format:**
-```json
-{
-  "latestVersion": "1.0.0",
-  "latestUrl": "https://raw.githubusercontent.com/pixelpropshop/JBoardsFirmware/main/JBOARD-16/versions/1.0.0/firmware.bin",
-  "checksum": "sha256_checksum_of_firmware_binary"
-}
-```
+| Consumer | Fetches |
+|---|---|
+| ESP32 web UI (`firmwareService.ts`) | `esp32/manifest.json`, `esp32/versions.json` |
+| PB2 device updater (`UpdateManager.cpp`) | `pb2/manifest.json` |
 
-### versions.json
+Both look up their own entry by normalized board name: the board's reported
+product name, upper-cased, spaces to hyphens — `Waveshare ESP32-P4 Nano` →
+`WAVESHARE-ESP32-P4-NANO`. A manifest key that does not match what a board
+reports publishes cleanly and then fails on the device, so that mapping is
+checked as part of releasing.
 
-Contains a complete list of all available firmware versions with detailed metadata.
+## Publishing
 
-**Format:**
-```json
-{
-  "versions": [
-    {
-      "version": "1.0.0",
-      "buildDate": "2024-11-14",
-      "stable": true,
-      "changelog": "Release notes here",
-      "checksum": "sha256_checksum_of_firmware_binary",
-      "fileSize": 1234567,
-      "minHardwareVersion": "1.0"
-    }
-  ]
-}
-```
-
-## Adding a New Firmware Version
-
-### Step 1: Build the Firmware
-
-Build the firmware using PlatformIO:
+From the firmware repo:
 
 ```bash
-# For JBOARD-16
-pio run -e jboard16
-
-# For JBOARD-8
-pio run -e jboard8
-
-# For JBOARD-4
-pio run -e jboard4
-
-# For JBOARD-2
-pio run -e jboard2
+python tools/release.py --env p4-nano-test --changelog-file notes.md \
+    --repo-dir ../JBoardsFirmware --dry-run          # inspect first, always
+python tools/release.py --env p4-nano-test --changelog-file notes.md \
+    --repo-dir ../JBoardsFirmware --commit --push
 ```
 
-The compiled firmware will be at: `.pio/build/{environment}/firmware.bin`
+It builds, packages a combined firmware+filesystem image, re-parses the
+package header to confirm the embedded version and board tag, uploads the
+asset, and writes the manifest **last** — so a bad release is undone by
+reverting one small commit, with no rebuild and no asset surgery.
 
-### Step 2: Calculate SHA256 Checksum
-
-Calculate the SHA256 checksum of the firmware binary:
-
-**Windows (PowerShell):**
-```powershell
-Get-FileHash firmware.bin -Algorithm SHA256
-```
-
-**Linux/macOS:**
-```bash
-sha256sum firmware.bin
-```
-
-**Online Alternative:**
-Upload to https://emn178.github.io/online-tools/sha256_checksum.html
-
-### Step 3: Create Version Directory
-
-Create a new version directory in the appropriate board folder:
+Then confirm what the world actually sees:
 
 ```bash
-mkdir -p JBOARD-16/versions/1.0.1
+python tools/validate_manifest.py --live esp32 --check-urls
 ```
 
-### Step 4: Copy Firmware Binary
+**`--check-urls` is not optional.** A manifest can be schema-valid, pass the
+dry run, and still point at an asset that is not there — that is exactly how
+v0.0.1 first shipped (the asset was published under its local filename while
+the manifest named another). Nothing else in the pipeline detects it, and the
+symptom on the device is a 404 mid-update. Also note the validator needs
+`jsonschema` installed or it skips structural validation and still prints OK.
 
-Copy the firmware binary to the version directory:
+## Schema
 
-```bash
-cp .pio/build/jboard16/firmware.bin JBOARD-16/versions/1.0.1/
-```
+Schema version 2. Normative definitions live in the firmware repo at
+`docs/schemas/firmware-manifest.schema.json` and
+`docs/schemas/firmware-versions.schema.json`; design and rationale in
+`docs/architecture/FIRMWARE_DISTRIBUTION.md` (ruling D-26).
 
-### Step 5: Update versions.json
+## History
 
-Add the new version to the `versions` array in `versions.json`:
-
-```json
-{
-  "versions": [
-    {
-      "version": "1.0.1",
-      "buildDate": "2024-11-15",
-      "stable": true,
-      "changelog": "Bug fixes:\n- Fixed WiFi reconnection issue\n- Improved LED synchronization",
-      "checksum": "your_calculated_sha256_checksum_here",
-      "fileSize": 1234567,
-      "minHardwareVersion": "1.0"
-    },
-    {
-      "version": "1.0.0",
-      "buildDate": "2024-11-14",
-      "stable": true,
-      "changelog": "Initial release",
-      "checksum": "previous_checksum",
-      "fileSize": 1234000,
-      "minHardwareVersion": "1.0"
-    }
-  ]
-}
-```
-
-**Note:** List versions in reverse chronological order (newest first).
-
-### Step 6: Update manifest.json
-
-If the new version is the latest stable release, update `manifest.json`:
-
-```json
-{
-  "latestVersion": "1.0.1",
-  "latestUrl": "https://raw.githubusercontent.com/pixelpropshop/JBoardsFirmware/main/JBOARD-16/versions/1.0.1/firmware.bin",
-  "checksum": "your_calculated_sha256_checksum_here"
-}
-```
-
-### Step 7: Commit and Push
-
-Commit all changes to the GitHub repository:
-
-```bash
-git add .
-git commit -m "Release firmware v1.0.1 for JBOARD-16"
-git push origin main
-```
-
-## Version Numbering
-
-Follow semantic versioning (MAJOR.MINOR.PATCH):
-
-- **MAJOR**: Incompatible API changes or hardware requirements
-- **MINOR**: New features (backward compatible)
-- **PATCH**: Bug fixes (backward compatible)
-
-## Changelog Guidelines
-
-Write clear, concise changelogs:
-
-```
-Version 1.0.1 - Bug Fixes
-- Fixed WiFi reconnection after network drop
-- Improved LED output synchronization
-- Resolved memory leak in effects manager
-- Updated RTC timezone handling
-
-Version 1.0.0 - Initial Release
-- Full 16-channel LED control
-- WiFi network management
-- Web-based configuration
-- RTC and OLED support
-```
-
-## Testing Firmware Updates
-
-Before releasing:
-
-1. **Local Testing**: Test the firmware on actual hardware
-2. **Checksum Verification**: Verify the checksum matches
-3. **OTA Update Test**: Test the OTA update process end-to-end
-4. **Rollback Test**: Ensure rollback to previous version works
-
-## Board Variants
-
-### JBOARD-16
-- 16 LED outputs
-- RTC, OLED, Sensors, Audio support
-- Max 2048 pixels per output
-
-### JBOARD-8
-- 8 LED outputs
-- Sensors and Audio support
-- Max 2048 pixels per output
-
-### JBOARD-4
-- 4 LED outputs
-- Basic features only
-- Max 1024 pixels per output
-
-### JBOARD-2
-- 2 LED outputs
-- Minimal features
-- Max 1024 pixels per output
-
-## Update Process Flow
-
-1. User clicks "Check for Updates" in Settings page
-2. Frontend fetches `manifest.json` and `versions.json` from GitHub
-3. Compares current version with latest version
-4. Shows available updates with changelog
-5. User selects version to install
-6. Frontend downloads `firmware.bin` from GitHub
-7. Frontend uploads firmware to device via `/api/system/firmware/upload`
-8. Device verifies checksum (if provided)
-9. Device installs firmware to OTA partition
-10. Device reboots with new firmware
-11. Previous firmware remains in backup partition for rollback
-
-## Security Considerations
-
-- Always verify SHA256 checksums
-- Use HTTPS for all downloads
-- Keep backup firmware partition for rollback
-- Test thoroughly before marking as stable
-- Document minimum hardware version requirements
-
-## Support
-
-For issues or questions, please open an issue in the JBoards repository:
-https://github.com/pixelpropshop/JBoards
-
-## License
-
-Firmware binaries are proprietary to Pixel Prop Shop.
+Before 2026-07-28 this repo used a different layout: one top-level directory
+per board (`JBOARD-16/`, `WAVESHARE-ESP32-P4-NANO/`) holding a flat schema-1
+manifest plus committed `versions/<v>/firmware.bin` images. Those directories
+were removed when the schema-2 layout was first published. Nothing was
+stranded: no boards were in the field, and the S3 `JBOARD-*` family had already
+been removed from the firmware entirely. Earlier tags still contain the old
+tree if it is ever needed.
