@@ -1,0 +1,4 @@
+# Browser mirrors of release assets (D-205): committed as plain binary files,
+# served from raw.githubusercontent.com. Never Git LFS (raw would serve the
+# pointer, not the bytes) and never end-of-line converted.
+/*/files/** binary

@@ -5,6 +5,7 @@
     "WAVESHARE-ESP32-P4-NANO": {
       "version": "0.0.4",
       "url": "https://github.com/pixelpropshop/JBoardsFirmware/releases/download/v0.0.4/firmware-WAVESHARE-ESP32-P4-NANO-0.0.4.bin",
+      "rawUrl": "https://raw.githubusercontent.com/pixelpropshop/JBoardsFirmware/main/esp32/files/v0.0.4/firmware-WAVESHARE-ESP32-P4-NANO-0.0.4.bin",
       "sha256": "D97C8AD8B6727FF421D7A94323C640761BDEFB2E2EF1A9E759B88C4C20A4904F",
       "size": 8876528,
       "updateType": "combined",
